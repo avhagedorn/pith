@@ -1,7 +1,5 @@
-import { setTimeout as sleep } from 'node:timers/promises';
 import { Type } from '@earendil-works/pi-ai';
-import { defineTool, strict } from '../shared.js';
-import { untrusted, webSignal } from '../web.js';
+import { defineTool, strict, untrusted, webSignal } from '../shared.js';
 
 // Exa's hosted search endpoint. It answers anonymous requests within a rate limit; a key lifts it.
 const ENDPOINT = 'https://mcp.exa.ai/mcp';
@@ -16,18 +14,11 @@ const DESCRIPTION =
   'Use fetch to read a result in full.';
 
 const RATE_LIMITED_FLAG = 'ai.exa/rateLimited';
-// The anonymous limit is counted over a short window, so a brief wait usually clears it.
-const RETRY_DELAYS_MS = [2000, 6000];
+const RATE_LIMITED = 'Search is rate limited right now. Add exaApiKey to the config, or wait.';
 
 interface Reply {
   result?: { content?: { text?: string }[]; isError?: boolean; _meta?: Record<string, unknown> };
   error?: { message?: string };
-}
-
-class RateLimited extends Error {
-  constructor() {
-    super('Search is rate limited right now. Do not retry yet; fetch a known URL instead.');
-  }
 }
 
 // The endpoint replies as a server-sent event stream; the JSON-RPC reply is its data line.
@@ -35,7 +26,7 @@ class RateLimited extends Error {
 export function parseSearchReply(body: string): string {
   const line = body.split('\n').find(line => line.startsWith(EVENT_DATA));
   const reply: Reply = JSON.parse(line ? line.slice(EVENT_DATA.length) : body);
-  if (reply.result?._meta?.[RATE_LIMITED_FLAG]) throw new RateLimited();
+  if (reply.result?._meta?.[RATE_LIMITED_FLAG]) throw new Error(RATE_LIMITED);
   const text = reply.result?.content?.map(part => part.text ?? '').join('\n');
   if (reply.error || reply.result?.isError || !text) {
     throw new Error(`Search failed: ${reply.error?.message ?? (text || 'empty reply')}`);
@@ -43,17 +34,7 @@ export function parseSearchReply(body: string): string {
   return text;
 }
 
-interface SearchOptions {
-  endpoint?: string;
-  retryDelays?: number[];
-  apiKey?: string; // lifts the anonymous rate limit
-}
-
-export const search = ({
-  endpoint = ENDPOINT,
-  retryDelays = RETRY_DELAYS_MS,
-  apiKey,
-}: SearchOptions = {}) =>
+export const search = (apiKey?: string, endpoint = ENDPOINT) =>
   defineTool(
     'search',
     DESCRIPTION,
@@ -65,34 +46,23 @@ export const search = ({
       strict,
     ),
     async ({ query, results = DEFAULT_RESULTS }, signal) => {
-      const request = async () => {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json, text/event-stream',
-            ...(apiKey && { [API_KEY_HEADER]: apiKey }),
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'tools/call',
-            params: { name: REMOTE_TOOL, arguments: { query, numResults: results } },
-          }),
-          signal: webSignal(signal),
-        });
-        if (!response.ok) throw new Error(`Search failed: HTTP ${response.status}`);
-        return parseSearchReply(await response.text());
-      };
-
-      for (const delay of retryDelays) {
-        try {
-          return { text: untrusted('web search', await request()), isError: false };
-        } catch (error) {
-          if (!(error instanceof RateLimited)) throw error;
-          await sleep(delay, undefined, { signal });
-        }
-      }
-      return { text: untrusted('web search', await request()), isError: false };
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          ...(apiKey && { [API_KEY_HEADER]: apiKey }),
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: REMOTE_TOOL, arguments: { query, numResults: results } },
+        }),
+        signal: webSignal(signal),
+      });
+      if (!response.ok) throw new Error(`Search failed: HTTP ${response.status}`);
+      const text = parseSearchReply(await response.text());
+      return { text: untrusted('web search', text), isError: false };
     },
   );

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { SessionLog } from '../src/session.js';
+import { openSessionLog } from '../src/session.js';
 
 async function fixture(t: test.TestContext) {
   const dir = await mkdtemp(join(tmpdir(), 'pith-auth-test-'));
@@ -15,7 +15,7 @@ async function fixture(t: test.TestContext) {
 
 test('JSONL audit records have private permissions, valid lines, and API key redaction', async t => {
   const dir = join(await fixture(t), 'sessions');
-  const log = await SessionLog.create({ model: 'fixed' }, ['sk-or-test-only'], dir);
+  const log = await openSessionLog({ model: 'fixed' }, ['sk-or-test-only'], dir);
   await log.record({ type: 'tool_started', callId: 'one' });
   await log.record({ type: 'message', content: 'oops sk-or-test-only' });
   await log.close();

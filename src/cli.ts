@@ -4,12 +4,17 @@ import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import type { Context } from '@earendil-works/pi-ai';
 import * as ansi from './ansi.js';
-import { CONFIG_PATH, loadConfig, redact } from './config.js';
+import {
+  CONFIG_PATH,
+  INSTRUCTIONS_FILE,
+  loadConfig,
+  projectInstructions,
+  redact,
+} from './config.js';
 import { errorCode, errorText } from './errors.js';
-import { INSTRUCTIONS_FILE, projectInstructions } from './instructions.js';
 import { runTurn, type RunOutcome } from './loop.js';
 import { createModel, MODEL_ID, PROVIDER, REASONING } from './model.js';
-import { SessionLog } from './session.js';
+import { openSessionLog } from './session.js';
 import { createTerminal, terminalText } from './terminal.js';
 import { createTools } from './tools/index.js';
 import { createTranscript } from './transcript.js';
@@ -87,9 +92,8 @@ async function main() {
   const interrupt = () => activeTurn?.abort();
   const term = createTerminal(text => terminalText(redact(text, secrets)), interrupt);
 
-  // Fails here, before any session or request, if the pinned model is missing.
-  createModel(openrouterApiKey, 'setup-check');
   if (values.check) {
+    createModel(openrouterApiKey, 'setup-check'); // throws if the pinned model is missing
     term.status(`model: ${MODEL_ID}\nworkspace: ${cwd}\ntools: ${toolNames}`);
     term.status(`search: Exa, ${exaApiKey ? 'with your key' : 'anonymous (rate limited)'}`);
     term.status(`config: ${CONFIG_PATH}`);
@@ -110,7 +114,7 @@ async function main() {
     .filter(Boolean)
     .join('\n\n');
   const context: Context = { systemPrompt, tools: tools.definitions, messages: [] };
-  const log = await SessionLog.create(
+  const log = await openSessionLog(
     {
       cwd,
       model: MODEL_ID,

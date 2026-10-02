@@ -1,6 +1,5 @@
 import { Type } from '@earendil-works/pi-ai';
-import { defineTool, MAX_FILE_BYTES, strict } from '../shared.js';
-import { untrusted, webSignal } from '../web.js';
+import { defineTool, MAX_FILE_BYTES, strict, untrusted, webSignal } from '../shared.js';
 
 const PAGE_CHARACTERS = 20_000;
 const MAX_URL_LENGTH = 2048;

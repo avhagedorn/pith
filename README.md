@@ -121,12 +121,12 @@ src/
   cli.ts          arguments, setup and the prompt loop
   loop.ts         the agent loop
   model.ts        the pinned model
-  config.ts       the config file and its keys
+  config.ts       the config file, its keys, and AGENTS.md
   session.ts      the audit log
-  instructions.ts loading AGENTS.md
   transcript.ts   progress events → what you see
   terminal.ts     all terminal output
-  render.ts       tool rows, summary and markdown styling
+  render.ts       tool rows and the turn summary
+  markdown.ts     markdown styling and tables
   ansi.ts         escape codes, by name
   tools/          one folder per tool, plus shared file helpers
 prompt.md         the whole system prompt

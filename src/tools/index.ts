@@ -12,14 +12,7 @@ export type { ToolOutput, ToolSet } from './shared.js';
 
 export async function createTools(cwd: string, exaApiKey?: string): Promise<ToolSet> {
   const root = await realpath(cwd);
-  const tools = [
-    read(root),
-    write(root),
-    edit(root),
-    bash(root),
-    search({ apiKey: exaApiKey }),
-    fetchPage(),
-  ];
+  const tools = [read(root), write(root), edit(root), bash(root), search(exaApiKey), fetchPage()];
   const runners = new Map(tools.map(tool => [tool.definition.name, tool.run]));
 
   return {

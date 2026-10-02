@@ -1,6 +1,7 @@
 import type { ToolCall } from '@earendil-works/pi-ai';
 import type { Notice, RunOutcome } from './loop.js';
-import { detail, markdownStyler, newStats, preview, rule, summary } from './render.js';
+import { markdownStyler } from './markdown.js';
+import { detail, newStats, preview, rule, summary } from './render.js';
 import type { Terminal } from './terminal.js';
 import type { ToolOutput } from './tools/index.js';
 

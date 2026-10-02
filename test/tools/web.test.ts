@@ -84,7 +84,7 @@ test('search posts the query and returns fenced results; failures are errors', a
       response.end(`event: message\ndata: ${JSON.stringify(reply)}\n\n`);
     });
   });
-  const result = await search({ endpoint: base, apiKey: 'exa-test' }).run(
+  const result = await search('exa-test', base).run(
     call('search', { query: 'pith', results: 3 }),
     signal(),
   );
@@ -98,39 +98,13 @@ test('search posts the query and returns fenced results; failures are errors', a
     /^<untrusted-web-content source="web search">\nTitle: A\nURL: https:\/\/a\.dev\n</,
   );
 
-  assert.throws(() => parseSearchReply('{"error":{"message":"rate limited"}}'), /rate limited/);
+  assert.throws(() => parseSearchReply('{"error":{"message":"boom"}}'), /boom/);
+  const limited = { result: { _meta: { 'ai.exa/rateLimited': true }, content: [{ text: 'x' }] } };
+  assert.throws(() => parseSearchReply(JSON.stringify(limited)), /rate limited right now/);
   assert.throws(() => parseSearchReply('data: {"result":{"content":[]}}'), /empty reply/);
   const down = await serve(t, (_, response) => response.writeHead(503).end());
   await assert.rejects(
-    search({ endpoint: down }).run(call('search', { query: 'x' }), signal()),
+    search(undefined, down).run(call('search', { query: 'x' }), signal()),
     /HTTP 503/,
-  );
-});
-
-test('a rate-limited search waits and retries, then gives up with a clear error', async t => {
-  const limited = {
-    result: { _meta: { 'ai.exa/rateLimited': true }, content: [{ text: 'limit' }] },
-  };
-  const fine = { result: { content: [{ text: 'Title: A' }] } };
-  let requests = 0;
-  const flaky = await serve(t, (_, response) => {
-    response.end(`data: ${JSON.stringify(++requests < 3 ? limited : fine)}\n`);
-  });
-  const result = await search({ endpoint: flaky, retryDelays: [1, 1] }).run(
-    call('search', { query: 'x' }),
-    signal(),
-  );
-  assert.match(result.text, /Title: A/);
-  assert.equal(requests, 3);
-
-  const blocked = await serve(t, (_, response) =>
-    response.end(`data: ${JSON.stringify(limited)}\n`),
-  );
-  await assert.rejects(
-    search({ endpoint: blocked, retryDelays: [1, 1] }).run(
-      call('search', { query: 'x' }),
-      signal(),
-    ),
-    /rate limited right now/,
   );
 });
