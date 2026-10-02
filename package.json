@@ -1,0 +1,17 @@
+{
+  "name": "pith",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A plain-terminal coding agent: one model, four tools, one loop.",
+  "engines": { "node": ">=22.19.0" },
+  "bin": { "pith": "dist/src/cli.js" },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/src/cli.js",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": { "@earendil-works/pi-ai": "1.0.0" },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.9.0" }
+}

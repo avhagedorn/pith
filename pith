@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ ! -f "$DIR/dist/src/cli.js" ]; then
+  printf '%s\n' 'Run npm install --ignore-scripts && npm run build in the pith directory first.' >&2
+  exit 1
+fi
+exec node "$DIR/dist/src/cli.js" "$@"
