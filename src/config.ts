@@ -7,6 +7,7 @@ import { bounded, readText } from './tools/shared.js';
 export const CONFIG_PATH = join(homedir(), '.config', 'pith', 'config.json');
 const OTHERS_CAN_READ = 0o077;
 const REDACTED = '[REDACTED]';
+const COMMENT_LINES = /^\s*\/\/.*$/gm;
 
 const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 const DEFAULTS = { reasoning: 'low', maxOutputTokens: 8192, maxSteps: 20 } as const;
@@ -30,7 +31,8 @@ export async function loadConfig(path = CONFIG_PATH): Promise<Config> {
     if ((await stat(path)).mode & OTHERS_CAN_READ) {
       throw new Error(`${path} holds API keys but is readable by others. Run: chmod 600 ${path}`);
     }
-    file = JSON.parse(await readFile(path, 'utf8'));
+    // Whole-line // comments are allowed, so the file can be annotated.
+    file = JSON.parse((await readFile(path, 'utf8')).replace(COMMENT_LINES, ''));
   } catch (error) {
     if (errorCode(error) === 'ENOENT') throw new Error(`No config. Create ${path} (see README).`);
     if (error instanceof SyntaxError) throw new Error(`${path} is not valid JSON.`);

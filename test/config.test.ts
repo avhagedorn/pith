@@ -32,6 +32,11 @@ test('config must exist, be private and hold an OpenRouter key; the Exa key is o
   );
   assert.equal((await loadConfig(path)).exaApiKey, 'exa-y');
 
+  const annotated =
+    '{\n  "openrouterApiKey": "k", "model": "a/b",\n  // optional below\n  "maxSteps": 5\n}';
+  await writeFile(path, annotated);
+  assert.equal((await loadConfig(path)).maxSteps, 5);
+
   await writeFile(path, JSON.stringify({ exaApiKey: 'exa-y' }));
   await assert.rejects(loadConfig(path), /Add "openrouterApiKey"/);
   await writeFile(path, JSON.stringify({ openrouterApiKey: 'sk-or-x' }));
