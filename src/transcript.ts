@@ -15,7 +15,7 @@ interface Burst {
  * a finished line at a time, and a summary rule when the turn ends.
  */
 export function createTranscript(term: Terminal) {
-  let style = markdownStyler(term.styled);
+  let style = markdownStyler(term.styled, term.width);
   let pending = ''; // text received since the last newline
   let said = false; // this response has printed text
   let gapOwed = false; // a blank line is due before the next text
@@ -25,26 +25,32 @@ export function createTranscript(term: Terminal) {
   let rowsAbove = false; // tool rows sit directly above, so text needs a blank line first
   let shownAnything = false; // this turn has output, so the summary needs a blank line first
 
-  // Blank lines are held back: dropped at either end of a response, collapsed in the middle.
-  const say = (line: string) => {
-    if (!line.trim()) {
-      gapOwed = said;
-      return;
-    }
+  const print = (styledLine: string) => {
     burst = undefined;
     if (rowsAbove) term.status('');
     rowsAbove = false;
     shownAnything = true;
-    term.text(`${gapOwed ? '\n' : ''}${style(term.clean(line))}`);
+    term.text(`${gapOwed ? '\n' : ''}${styledLine}`);
     said = true;
     gapOwed = false;
   };
 
+  // Blank lines are held back: dropped at either end of a response, collapsed in the middle.
+  const say = (line: string) => {
+    if (line.trim()) {
+      style.push(term.clean(line)).forEach(print);
+      return;
+    }
+    style.flush().forEach(print); // a blank line ends a table
+    gapOwed = said;
+  };
+
   const endText = () => {
     say(pending);
+    style.flush().forEach(print);
     pending = '';
     said = gapOwed = false;
-    style = markdownStyler(term.styled); // an unclosed code fence must not leak onward
+    style = markdownStyler(term.styled, term.width); // an unclosed code fence must not leak onward
   };
 
   const toolEnded = (call: ToolCall, result: ToolOutput) => {

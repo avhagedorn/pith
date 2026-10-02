@@ -2,7 +2,7 @@
 
 A coding agent small enough to read in one sitting.
 
-One model, four tools, one loop. About 1,300 lines of TypeScript on top of [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai). It runs in a plain terminal: no TUI, no plugins, no server.
+One model, four tools, one loop. About 1,500 lines of TypeScript on top of [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai). It runs in a plain terminal: no TUI, no plugins, no server.
 
 ```text
 ❯ fix the add bug
@@ -46,7 +46,7 @@ File tools stay inside the workspace. Files are capped at **2 MiB** and tool res
 
 Each tool call is one dim row with a diamond: blinking while it runs, green when it works, red when it doesn't. Repeats of the same tool share a row. Edits show line counts instead of a diff.
 
-Model text prints a line at a time with light markdown styling. A blank line separates it from the tool rows above and from the one-line summary that ends each turn.
+Model text prints a line at a time with light markdown styling. Tables wait for their last row, then print with aligned columns. One too wide for the terminal prints each row as `Header: value` lines instead. A blank line separates it from the tool rows above and from the one-line summary that ends each turn.
 
 The rest is your terminal. Scrollback, selection and search work as usual, because nothing redraws the screen. Typing during a run is ignored; Ctrl-C cancels it.
 
@@ -90,7 +90,7 @@ If the workspace has an `AGENTS.md` at its root, it's added to the system prompt
 
 Resume a session, compact context, sandbox anything, read images, run tools in parallel, switch models, or take plugins.
 
-Tables aren't aligned and checkboxes aren't rendered. Windows isn't supported.
+Checkboxes aren't rendered. Windows isn't supported.
 
 ## Development
 

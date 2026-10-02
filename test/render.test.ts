@@ -68,9 +68,9 @@ test('compact rendering: previews, details, rows and summary', async () => {
 });
 
 test('markdown styling is line-at-a-time and off without color', async () => {
-  const plain = markdownStyler(false);
-  assert.equal(plain('## **Hi** `x`'), '## **Hi** `x`');
-  const style = markdownStyler(true);
+  assert.deepEqual(markdownStyler(false).push('| a | `x` |'), ['| a | `x` |']);
+  const styler = markdownStyler(true);
+  const style = (line: string) => styler.push(line).join('\n');
   const B = '\x1b[1m',
     b = '\x1b[22m',
     I = '\x1b[3m',
@@ -100,8 +100,6 @@ test('markdown styling is line-at-a-time and off without color', async () => {
   );
   assert.equal(style('> quoted **text**'), `${D}│${b} ${I}quoted ${B}text${b}${i}`);
   assert.equal(style('---'), `${D}${'─'.repeat(40)}${b}`);
-  assert.equal(style('| a | **b** |'), `${D}│${b} a ${D}│${b} ${B}b${b} ${D}│${b}`);
-  assert.equal(style('|---|:-:|'), `${D}│───│───│${b}`);
   assert.equal(style('1. first'), '1. first');
   assert.equal(style('```ts'), `${D}\`\`\`ts${b}`);
   assert.equal(
@@ -110,4 +108,59 @@ test('markdown styling is line-at-a-time and off without color', async () => {
   );
   assert.equal(style('```'), `${D}\`\`\`${b}`);
   assert.equal(style('**after**'), `${B}after${b}`);
+});
+
+test('tables are held until they end, then printed with aligned columns', () => {
+  const styler = markdownStyler(true);
+  const B = '\x1b[1m',
+    b = '\x1b[22m',
+    D = '\x1b[2m';
+  const rows = [
+    '| File | Lines | Role |',
+    '|---|---:|:--|',
+    '| cli.ts | 204 | entry |',
+    '| a.ts | 3 | `x \\| y` |',
+  ];
+  for (const row of rows) assert.deepEqual(styler.push(row), []);
+  assert.deepEqual(styler.push('after'), [
+    `${B}File${b}    ${B}Lines${b}  ${B}Role${b}`,
+    `${D}──────  ─────  ─────${b}`,
+    'cli.ts    204  entry',
+    'a.ts        3  \x1b[36mx | y\x1b[39m',
+    'after',
+  ]);
+
+  // No divider row: no header. A missing cell is padded, and flush releases what is held.
+  styler.push('| a | bb |');
+  styler.push('| ccc |');
+  assert.deepEqual(styler.flush(), ['a    bb', 'ccc']);
+  assert.deepEqual(styler.flush(), []);
+
+  // Inside a code fence a pipe is just text.
+  styler.push('```');
+  assert.deepEqual(styler.push('| not | a table |'), ['\x1b[36m| not | a table |\x1b[0m']);
+});
+
+test('a table too wide for the terminal becomes header: value lines', () => {
+  const styler = markdownStyler(true, () => 30);
+  const B = '\x1b[1m',
+    b = '\x1b[22m';
+  styler.push('| # | Why |');
+  styler.push('|---|---|');
+  styler.push('| 1 | the quick **brown fox** jumps over the lazy dog |');
+  styler.push('| 2 | short |');
+  assert.deepEqual(styler.flush(), [
+    `${B}#${b}: 1`,
+    `${B}Why${b}: the quick ${B}brown fox${b} jumps over the lazy dog`,
+    '',
+    `${B}#${b}: 2`,
+    `${B}Why${b}: short`,
+  ]);
+
+  // The same table with room to spare stays a grid.
+  const wide = markdownStyler(true, () => 80);
+  wide.push('| # | Why |');
+  wide.push('|---|---|');
+  wide.push('| 2 | short |');
+  assert.equal(wide.flush().at(-1), '2  short');
 });

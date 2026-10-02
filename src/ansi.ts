@@ -27,3 +27,6 @@ export const CLEAR_LINE = '\r\x1b[K';
 export const CURSOR_UP = '\x1b[1A';
 export const HIDE_CURSOR = '\x1b[?25l';
 export const SHOW_CURSOR = '\x1b[?25h';
+
+const CODES = /\x1b\[[0-9;]*m/g;
+export const visibleLength = (text: string) => [...text.replace(CODES, '')].length;
