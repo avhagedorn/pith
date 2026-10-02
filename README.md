@@ -104,3 +104,17 @@ File tools stay inside the repo. Tool results are capped at **32 KiB**. When a c
 Tool calls are one line each. Answers print a line at a time with light markdown styling.
 
 Nothing redraws the screen. The only cursor movement is updating the line a running tool is on.
+
+## Why?
+
+I believe these things:
+1. Models are smart and can figure it out
+2. Context bloat is a disease that burns tokens. Per 1, models are smart enough
+3. GUI / TUI interfaces are often clunky / slow
+4. Understanding how a harness I use everyday operates is a win
+
+For months my main and only harness has been [Pi](https://pi.dev/). After the [Pi 1.0 update](https://earendil.com/posts/pi-1-0/) however, I felt they moved away from the low-bloat extreme that had enticed me to switch from Claude Code.
+
+I run local llms quite often and Pi was the only harness that didn't saturate my context window with useless jargon.
+
+I figure now is as good a time as any to try to build a super small harness :)
