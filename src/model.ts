@@ -25,7 +25,7 @@ export function createModel(apiKey: string, sessionId: string): Generate {
       maxRetries: 0,
       // A fixed model, not openrouter/auto or a fallback model list.
       // Disable OpenRouter's context compression; our transcript stays explicit.
-      onPayload: (payload) => ({ ...(payload as Record<string, unknown>), transforms: [] }),
+      onPayload: payload => ({ ...(payload as Record<string, unknown>), transforms: [] }),
     });
     for await (const event of stream) {
       if (event.type === 'text_delta') onText(event.delta);

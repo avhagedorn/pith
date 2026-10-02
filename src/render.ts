@@ -1,7 +1,8 @@
 import type { ToolCall } from '@earendil-works/pi-ai';
 import type { ToolOutput } from './tools.js';
 
-const lineCount = (text: unknown) => typeof text === 'string' && text ? text.replace(/\n$/, '').split('\n').length : 0;
+const lineCount = (text: unknown) =>
+  typeof text === 'string' && text ? text.replace(/\n$/, '').split('\n').length : 0;
 
 // Sub-second durations render as "" so fast tools stay clutter-free.
 export function duration(ms: number): string {
@@ -42,8 +43,22 @@ export function row(text: string, state: 'run' | 'ok' | 'error', color: boolean,
   return `\x1b[${mark}m◆\x1b[0m ${state === 'error' ? body : `\x1b[2m${body}\x1b[0m`}`;
 }
 
-export interface TurnStats { reads: Set<string>; edits: Set<string>; commands: number; failed: number; cost: number; startedAt: number }
-export const newStats = (): TurnStats => ({ reads: new Set(), edits: new Set(), commands: 0, failed: 0, cost: 0, startedAt: Date.now() });
+export interface TurnStats {
+  reads: Set<string>;
+  edits: Set<string>;
+  commands: number;
+  failed: number;
+  cost: number;
+  startedAt: number;
+}
+export const newStats = (): TurnStats => ({
+  reads: new Set(),
+  edits: new Set(),
+  commands: 0,
+  failed: 0,
+  cost: 0,
+  startedAt: Date.now(),
+});
 
 export function summary(stats: TurnStats, ms: number): string {
   const parts = [
@@ -51,22 +66,41 @@ export function summary(stats: TurnStats, ms: number): string {
     stats.edits.size && `edited ${stats.edits.size} file${stats.edits.size === 1 ? '' : 's'}`,
     stats.commands && `ran ${stats.commands} command${stats.commands === 1 ? '' : 's'}`,
     stats.failed && `${stats.failed} failed`,
-  ].filter(Boolean).join(', ');
-  return [parts && parts[0]!.toUpperCase() + parts.slice(1), duration(ms), `~$${stats.cost.toFixed(4)}`].filter(Boolean).join(' · ');
+  ]
+    .filter(Boolean)
+    .join(', ');
+  return [parts && parts[0]!.toUpperCase() + parts.slice(1), duration(ms), `~$${stats.cost.toFixed(4)}`]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 // Inline spans. Code spans are split out first so nothing inside them is restyled.
 // Underscore emphasis needs word boundaries (snake_case); asterisks need a non-space inside ("2 * 3").
 function inline(text: string): string {
-  const span = (input: string, mark: string, on: string, off: string) => input
-    .replace(new RegExp(`(?<![\\\\*])\\*{${mark.length}}(?=\\S)(.+?)(?<=[^\\s\\\\])\\*{${mark.length}}(?!\\*)`, 'g'), `\x1b[${on}m$1\x1b[${off}m`)
-    .replace(new RegExp(`(?<![\\w_\\\\])_{${mark.length}}(?=\\S)(.+?)(?<=[^\\s\\\\])_{${mark.length}}(?![\\w_])`, 'g'), `\x1b[${on}m$1\x1b[${off}m`);
-  return text.split(/(`[^`]+`)/).map((part, i) => {
-    if (i % 2) return `\x1b[36m${part.slice(1, -1)}\x1b[39m`;
-    part = part.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, url) => `\x1b[4m${label}\x1b[24m \x1b[2m(${url.replace(/[*_~]/g, '\\$&')})\x1b[22m`);
-    part = span(span(span(part, '***', '1;3', '22;23'), '**', '1', '22'), '*', '3', '23');
-    return part.replace(/(?<!\\)~~(?=\S)(.+?)(?<=[^\s\\])~~/g, '\x1b[9m$1\x1b[29m').replace(/\\([*_~`\\[\]#>|-])/g, '$1');
-  }).join('');
+  const span = (input: string, mark: string, on: string, off: string) =>
+    input
+      .replace(
+        new RegExp(`(?<![\\\\*])\\*{${mark.length}}(?=\\S)(.+?)(?<=[^\\s\\\\])\\*{${mark.length}}(?!\\*)`, 'g'),
+        `\x1b[${on}m$1\x1b[${off}m`,
+      )
+      .replace(
+        new RegExp(`(?<![\\w_\\\\])_{${mark.length}}(?=\\S)(.+?)(?<=[^\\s\\\\])_{${mark.length}}(?![\\w_])`, 'g'),
+        `\x1b[${on}m$1\x1b[${off}m`,
+      );
+  return text
+    .split(/(`[^`]+`)/)
+    .map((part, i) => {
+      if (i % 2) return `\x1b[36m${part.slice(1, -1)}\x1b[39m`;
+      part = part.replace(
+        /\[([^\]]+)\]\(([^)\s]+)\)/g,
+        (_, label, url) => `\x1b[4m${label}\x1b[24m \x1b[2m(${url.replace(/[*_~]/g, '\\$&')})\x1b[22m`,
+      );
+      part = span(span(span(part, '***', '1;3', '22;23'), '**', '1', '22'), '*', '3', '23');
+      return part
+        .replace(/(?<!\\)~~(?=\S)(.+?)(?<=[^\s\\])~~/g, '\x1b[9m$1\x1b[29m')
+        .replace(/\\([*_~`\\[\]#>|-])/g, '$1');
+    })
+    .join('');
 }
 
 // Styles model markdown one completed line at a time; the only state is whether we are inside a code fence.
@@ -77,7 +111,10 @@ export function markdownStyler(color: boolean): (line: string) => string {
   if (!color) return line => line;
   const dim = (text: string) => `\x1b[2m${text}\x1b[22m`;
   return line => {
-    if (/^\s*```/.test(line)) { fence = !fence; return dim(line); }
+    if (/^\s*```/.test(line)) {
+      fence = !fence;
+      return dim(line);
+    }
     if (fence) return `\x1b[36m${line}\x1b[0m`;
     const heading = /^#{1,6}\s+(.*)$/.exec(line);
     if (heading) return `\x1b[1;33m${heading[1]!.replace(/\*\*|__|`/g, '')}\x1b[0m`;
@@ -85,7 +122,9 @@ export function markdownStyler(color: boolean): (line: string) => string {
     const quote = /^\s*>\s?(.*)$/.exec(line);
     if (quote) return `${dim('│')} \x1b[3m${inline(quote[1]!)}\x1b[23m`;
     if (/^\s*\|/.test(line)) {
-      return /^[\s|:-]+$/.test(line) ? dim(line.replace(/\|/g, '│').replace(/[:-]/g, '─')) : inline(line).replace(/\|/g, dim('│'));
+      return /^[\s|:-]+$/.test(line)
+        ? dim(line.replace(/\|/g, '│').replace(/[:-]/g, '─'))
+        : inline(line).replace(/\|/g, dim('│'));
     }
     return inline(line.replace(/^(\s*)[-*+]\s+/, '$1• '));
   };

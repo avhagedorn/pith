@@ -11,7 +11,10 @@ export type Notice =
   | { type: 'tool-start'; call: ToolCall }
   | { type: 'tool-end'; call: ToolCall; result: ToolOutput }
   | { type: 'usage'; usage: Usage };
-export interface RunOutcome { reason: 'complete' | 'aborted' | 'limit' | 'error'; detail: string }
+export interface RunOutcome {
+  reason: 'complete' | 'aborted' | 'limit' | 'error';
+  detail: string;
+}
 
 export async function runTurn(options: {
   prompt: string;
@@ -44,18 +47,27 @@ export async function runTurn(options: {
     notify({ type: 'request', step });
     // Provider/setup exceptions must not execute partially streamed calls.
     let response;
-    try { response = await generate(context, signal, text => notify({ type: 'text', text })); }
-    catch (error) {
+    try {
+      response = await generate(context, signal, text => notify({ type: 'text', text }));
+    } catch (error) {
       return finish(signal.aborted ? 'aborted' : 'error', error instanceof Error ? error.message : String(error));
     }
     notify({ type: 'usage', usage: response.usage });
     if (signal.aborted || !['stop', 'toolUse'].includes(response.stopReason)) {
       await record({ type: 'incomplete_response', response }); // audit, not model history
-      return finish(signal.aborted ? 'aborted' : 'error', response.errorMessage || `Model stopped with ${response.stopReason}; no tools from this response were executed.`);
+      return finish(
+        signal.aborted ? 'aborted' : 'error',
+        response.errorMessage ||
+          `Model stopped with ${response.stopReason}; no tools from this response were executed.`,
+      );
     }
     const calls = response.content.filter((block): block is ToolCall => block.type === 'toolCall');
     const ids = new Set(calls.map(call => call.id));
-    if (ids.size !== calls.length || calls.some(call => !call.id) || (response.stopReason === 'toolUse' && !calls.length)) {
+    if (
+      ids.size !== calls.length ||
+      calls.some(call => !call.id) ||
+      (response.stopReason === 'toolUse' && !calls.length)
+    ) {
       await record({ type: 'invalid_response', response });
       return finish('error', 'Malformed tool-call IDs or empty tool-use response. Nothing executed.');
     }
@@ -70,12 +82,19 @@ export async function runTurn(options: {
         // An unmatched marker after a crash means outcome unknown, NOT retry.
         await record({ type: 'tool_started', callId: call.id, name: call.name });
         notify({ type: 'tool-start', call });
-        try { result = await tools.execute(call, signal); }
-        catch (error) { result = { text: error instanceof Error ? error.message : String(error), isError: true }; }
+        try {
+          result = await tools.execute(call, signal);
+        } catch (error) {
+          result = { text: error instanceof Error ? error.message : String(error), isError: true };
+        }
       }
       const message: ToolResultMessage = {
-        role: 'toolResult', toolCallId: call.id, toolName: call.name,
-        content: [{ type: 'text', text: result.text }], isError: result.isError, timestamp: Date.now(),
+        role: 'toolResult',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: [{ type: 'text', text: result.text }],
+        isError: result.isError,
+        timestamp: Date.now(),
       };
       await append(message);
       notify({ type: 'tool-end', call, result });

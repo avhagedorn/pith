@@ -45,7 +45,10 @@ async function main() {
       help: { type: 'boolean', short: 'h', default: false },
     },
   });
-  if (values.help) { process.stdout.write(HELP); return; }
+  if (values.help) {
+    process.stdout.write(HELP);
+    return;
+  }
   const cwd = await realpath(values.cwd || process.cwd());
   if (!(await stat(cwd)).isDirectory()) throw new Error('Workspace must be a directory.');
   const auth = await resolveKey();
@@ -55,9 +58,12 @@ async function main() {
   const color = tty && !process.env.NO_COLOR;
   const wipe = tty ? '\r\x1b[K' : '';
   // Hidden while the agent runs, so a visible cursor always means "your turn".
-  const cursor = (show: boolean) => { if (tty) process.stderr.write(show ? '\x1b[?25h' : '\x1b[?25l'); };
+  const cursor = (show: boolean) => {
+    if (tty) process.stderr.write(show ? '\x1b[?25h' : '\x1b[?25l');
+  };
   process.on('exit', () => cursor(true));
-  const status = (text: string, dim = false) => process.stderr.write(`${wipe}${dim && color ? `\x1b[2m${clean(text)}\x1b[0m` : clean(text)}\n`);
+  const status = (text: string, dim = false) =>
+    process.stderr.write(`${wipe}${dim && color ? `\x1b[2m${clean(text)}\x1b[0m` : clean(text)}\n`);
   const width = () => Math.min(process.stderr.columns || 100, 110);
   const paint = (text: string, state: 'run' | 'ok' | 'error', transient = false) => {
     if (transient && !tty) return;
@@ -68,7 +74,9 @@ async function main() {
   // Resolve the pinned catalog before starting a session or requesting tokens.
   createModel(auth.key, 'setup-check');
   if (values.check) {
-    status(`model: ${MODEL_ID}\nauth: ${auth.source}\nworkspace: ${cwd}\ntools: ${tools.definitions.map(t => t.name).join(', ')}\nlocal setup ready — no API request made; remote key validity not checked`);
+    status(
+      `model: ${MODEL_ID}\nauth: ${auth.source}\nworkspace: ${cwd}\ntools: ${tools.definitions.map(t => t.name).join(', ')}\nlocal setup ready — no API request made; remote key validity not checked`,
+    );
     return;
   }
 
@@ -89,35 +97,55 @@ async function main() {
   const basePrompt = (await readFile(new URL('../../prompt.md', import.meta.url), 'utf8')).trim();
   const systemPrompt = `${basePrompt}\n\nWorkspace: ${cwd}\nExecution mode: ${allowLocalTools ? 'local tools enabled; bash is unsandboxed' : 'read-only; only read is enabled'}.`;
   const context: Context = { systemPrompt, tools: tools.definitions, messages: [] };
-  const log = await SessionLog.create({ cwd, model: MODEL_ID, reasoning: 'low', systemPrompt, tools: tools.definitions, allowLocalTools }, auth.key);
+  const log = await SessionLog.create(
+    { cwd, model: MODEL_ID, reasoning: 'low', systemPrompt, tools: tools.definitions, allowLocalTools },
+    auth.key,
+  );
   const generate = createModel(auth.key, log.id);
   let active: AbortController | undefined;
   const interrupt = () => active?.abort();
   process.on('SIGINT', interrupt);
   // While a run is active, swallow keystrokes so terminal echo cannot corrupt the redrawn rows
   // or leak into the next prompt. Raw mode also turns off the tty's own Ctrl-C, so forward it.
-  const swallow = (data: Buffer) => { if (data.includes(3)) interrupt(); };
+  const swallow = (data: Buffer) => {
+    if (data.includes(3)) interrupt();
+  };
   const mute = (on: boolean) => {
     if (!process.stdin.isTTY) return;
     process.stdin.setRawMode(on);
     if (on) process.stdin.on('data', swallow).resume();
     else process.stdin.off('data', swallow).pause();
   };
-  process.on('exit', () => { if (process.stdin.isTTY) process.stdin.setRawMode(false); });
+  process.on('exit', () => {
+    if (process.stdin.isTTY) process.stdin.setRawMode(false);
+  });
   const history: string[] = [];
 
   async function ask(): Promise<string | undefined> {
-    const rl = createInterface({ input: process.stdin, output: process.stdout, history, removeHistoryDuplicates: true });
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      history,
+      removeHistoryDuplicates: true,
+    });
     const controller = new AbortController();
     rl.once('SIGINT', () => controller.abort());
     rl.once('close', () => controller.abort());
-    rl.on('history', entries => { history.splice(0, history.length, ...entries); });
+    rl.on('history', entries => {
+      history.splice(0, history.length, ...entries);
+    });
     const signal = AbortSignal.any([controller.signal, outputClosed.signal]);
     // The colour is left open so the typed text shares it; closed once the line is submitted.
     const tint = color && process.stdout.isTTY;
-    try { return await rl.question(tint ? '\n\x1b[1;36m❯ ' : '\n❯ ', { signal }); }
-    catch (error) { if (signal.aborted) return undefined; throw error; }
-    finally { rl.close(); if (tint) process.stdout.write('\x1b[0m'); }
+    try {
+      return await rl.question(tint ? '\n\x1b[1;36m❯ ' : '\n❯ ', { signal });
+    } catch (error) {
+      if (signal.aborted) return undefined;
+      throw error;
+    } finally {
+      rl.close();
+      if (tint) process.stdout.write('\x1b[0m');
+    }
   }
 
   // Model text is printed one completed line at a time, so each line can be styled without ever redrawing.
@@ -125,23 +153,34 @@ async function main() {
   let style = markdownStyler(styled);
   let pending = '';
   let said = false; // anything printed for this response yet
-  let gap = false;  // a blank line is owed before the next line of text
+  let gap = false; // a blank line is owed before the next line of text
   let stats = newStats();
   let started = 0;
   let burst: { name: string; count: number; ms: number } | undefined; // consecutive successes of one tool share a row
   const say = (line: string) => {
     // Leading/trailing blank lines are dropped (providers emit blank text before tool-only turns); runs collapse to one.
-    if (!line.trim()) { gap = said; return; }
+    if (!line.trim()) {
+      gap = said;
+      return;
+    }
     burst = undefined;
     process.stderr.write(wipe);
     process.stdout.write(`${gap ? '\n' : ''}${style(clean(line))}\n`);
     said = true;
     gap = false;
   };
-  const endText = () => { say(pending); pending = ''; said = gap = false; style = markdownStyler(styled); };
+  const endText = () => {
+    say(pending);
+    pending = '';
+    said = gap = false;
+    style = markdownStyler(styled);
+  };
   const notify = (notice: Notice) => {
     switch (notice.type) {
-      case 'request': endText(); paint('thinking', 'run', true); break;
+      case 'request':
+        endText();
+        paint('thinking', 'run', true);
+        break;
       case 'text': {
         const lines = (pending + notice.text).split('\n');
         pending = lines.pop()!;
@@ -162,18 +201,28 @@ async function main() {
         if (result.isError) stats.failed++;
         // A failure always keeps its own row and ends the burst.
         const previous = tty && !result.isError && burst?.name === call.name ? burst : undefined;
-        burst = result.isError ? undefined : { name: call.name, count: (previous?.count ?? 0) + 1, ms: (previous?.ms ?? 0) + ms };
+        burst = result.isError
+          ? undefined
+          : { name: call.name, count: (previous?.count ?? 0) + 1, ms: (previous?.ms ?? 0) + ms };
         if (previous) process.stderr.write(`${wipe}\x1b[1A`);
         const info = detail(call, result, burst?.ms ?? ms);
-        paint(`${previous ? `${burst!.count}× ` : ''}${preview(call)}${info ? ` {${info}}` : ''}`, result.isError ? 'error' : 'ok');
+        paint(
+          `${previous ? `${burst!.count}× ` : ''}${preview(call)}${info ? ` {${info}}` : ''}`,
+          result.isError ? 'error' : 'ok',
+        );
         break;
       }
-      case 'usage': stats.cost += notice.usage.cost.total;
+      case 'usage':
+        stats.cost += notice.usage.cost.total;
     }
   };
   try {
     status(`pith · ${MODEL_ID}\nworkspace: ${cwd}\nauth: ${auth.source}\nsession: ${log.path}`);
-    status(allowLocalTools ? 'LOCAL TOOLS ENABLED — bash is unsandboxed. Review changes.' : 'read-only — add --allow-local-tools to enable write/edit/bash.');
+    status(
+      allowLocalTools
+        ? 'LOCAL TOOLS ENABLED — bash is unsandboxed. Review changes.'
+        : 'read-only — add --allow-local-tools to enable write/edit/bash.',
+    );
     if (interactive) status('/new · /exit · Ctrl-C to cancel; wait for the prompt before typing.');
     let prompt: string | undefined = interactive ? await ask() : initial;
     while (prompt !== undefined) {
@@ -191,7 +240,15 @@ async function main() {
         if (interactive) process.stderr.write('\n');
         stats = newStats();
         burst = undefined;
-        const result = await runTurn({ prompt, context, generate, tools, record: log.record, notify, signal: AbortSignal.any([active.signal, outputClosed.signal]) });
+        const result = await runTurn({
+          prompt,
+          context,
+          generate,
+          tools,
+          record: log.record,
+          notify,
+          signal: AbortSignal.any([active.signal, outputClosed.signal]),
+        });
         active = undefined;
         endText();
         cursor(true);
@@ -211,8 +268,10 @@ async function main() {
 
 // A closed output pipe is normal when a consumer exits early.
 process.stdout.on('error', error => {
-  if ((error as NodeJS.ErrnoException).code === 'EPIPE') { outputClosed.abort(); process.exitCode = 1; }
-  else throw error;
+  if ((error as NodeJS.ErrnoException).code === 'EPIPE') {
+    outputClosed.abort();
+    process.exitCode = 1;
+  } else throw error;
 });
 main().catch(error => {
   // Errors here are local setup/storage errors. Provider errors go through the redacting renderer.

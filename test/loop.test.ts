@@ -5,10 +5,26 @@ import { runTurn, type Notice } from '../src/loop.js';
 import type { Generate } from '../src/model.js';
 
 const tool = (id = 'one'): ToolCall => ({ type: 'toolCall', id, name: 'read', arguments: { path: 'example' } });
-function response(content: AssistantMessage['content'], stopReason: AssistantMessage['stopReason'] = 'stop'): AssistantMessage {
+function response(
+  content: AssistantMessage['content'],
+  stopReason: AssistantMessage['stopReason'] = 'stop',
+): AssistantMessage {
   return {
-    role: 'assistant', content, stopReason, api: 'openai-completions', provider: 'openrouter', model: 'z-ai/glm-5.3-flash', timestamp: 1,
-    usage: { input: 1, output: 1, totalTokens: 2, cacheRead: 0, cacheWrite: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    role: 'assistant',
+    content,
+    stopReason,
+    api: 'openai-completions',
+    provider: 'openrouter',
+    model: 'z-ai/glm-5.3-flash',
+    timestamp: 1,
+    usage: {
+      input: 1,
+      output: 1,
+      totalTokens: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
   };
 }
 const final = () => response([{ type: 'text', text: 'done' }]);
@@ -27,10 +43,23 @@ function fixture(replies: AssistantMessage[]) {
     return reply;
   };
   const options = {
-    prompt: 'do it', context, generate, signal: controller.signal,
-    record: async (e: Record<string, unknown>) => { events.push(structuredClone(e)); },
-    notify: (n: Notice) => { notices.push(n); },
-    tools: { definitions: [], execute: async (call: ToolCall) => { executed.push(call.id); return { text: 'ok', isError: false }; } },
+    prompt: 'do it',
+    context,
+    generate,
+    signal: controller.signal,
+    record: async (e: Record<string, unknown>) => {
+      events.push(structuredClone(e));
+    },
+    notify: (n: Notice) => {
+      notices.push(n);
+    },
+    tools: {
+      definitions: [],
+      execute: async (call: ToolCall) => {
+        executed.push(call.id);
+        return { text: 'ok', isError: false };
+      },
+    },
   };
   return { context, events, notices, seen, executed, controller, options };
 }
@@ -39,7 +68,10 @@ test('text-only completes without tool execution', async () => {
   const f = fixture([final()]);
   assert.equal((await runTurn(f.options)).reason, 'complete');
   assert.deepEqual(f.executed, []);
-  assert.deepEqual(f.context.messages.map(m => m.role), ['user', 'assistant']);
+  assert.deepEqual(
+    f.context.messages.map(m => m.role),
+    ['user', 'assistant'],
+  );
 });
 
 test('tool batch is sequential, recorded before execution, and reasoning survives continuation', async () => {
@@ -57,16 +89,24 @@ test('tool batch is sequential, recorded before execution, and reasoning survive
   assert.deepEqual(f.executed, ['one', 'two']);
   assert.deepEqual(f.seen[1]?.messages[1], first);
   const results = f.seen[1]?.messages.filter(m => m.role === 'toolResult');
-  assert.deepEqual(results?.map(m => m.toolCallId), ['one', 'two']);
+  assert.deepEqual(
+    results?.map(m => m.toolCallId),
+    ['one', 'two'],
+  );
 });
 
 test('tool exception becomes a matching error result and the model can recover', async () => {
   const f = fixture([response([tool()], 'toolUse'), final()]);
-  f.options.tools.execute = async () => { throw new Error('failed edit'); };
+  f.options.tools.execute = async () => {
+    throw new Error('failed edit');
+  };
   assert.equal((await runTurn(f.options)).reason, 'complete');
   const result = f.context.messages[2];
   assert.equal(result?.role, 'toolResult');
-  if (result?.role === 'toolResult') { assert.equal(result.isError, true); assert.equal(result.toolCallId, 'one'); }
+  if (result?.role === 'toolResult') {
+    assert.equal(result.isError, true);
+    assert.equal(result.toolCallId, 'one');
+  }
 });
 
 test('aborted/error/length responses never execute partially received tools', async () => {
@@ -82,11 +122,18 @@ test('aborted/error/length responses never execute partially received tools', as
 
 test('cancellation during first tool settles every call ID without running remaining tools', async () => {
   const f = fixture([response([tool('one'), tool('two')], 'toolUse')]);
-  f.options.tools.execute = async call => { f.executed.push(call.id); f.controller.abort(); return { text: 'interrupted', isError: true }; };
+  f.options.tools.execute = async call => {
+    f.executed.push(call.id);
+    f.controller.abort();
+    return { text: 'interrupted', isError: true };
+  };
   assert.equal((await runTurn(f.options)).reason, 'aborted');
   assert.deepEqual(f.executed, ['one']);
   const results = f.context.messages.filter(m => m.role === 'toolResult');
-  assert.deepEqual(results.map(m => m.toolCallId), ['one', 'two']);
+  assert.deepEqual(
+    results.map(m => m.toolCallId),
+    ['one', 'two'],
+  );
   assert.ok(results.every(m => m.isError));
 });
 

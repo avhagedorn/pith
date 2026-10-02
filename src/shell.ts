@@ -22,7 +22,10 @@ export async function runShell(
   if (process.platform === 'win32') throw new Error('This prototype supports macOS/Linux shell execution only.');
   return new Promise((resolve, reject) => {
     const child = spawn('/bin/bash', ['--noprofile', '--norc', '-c', command], {
-      cwd, env: shellEnvironment(), detached: true, stdio: ['ignore', 'pipe', 'pipe'],
+      cwd,
+      env: shellEnvironment(),
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     let reason: string | undefined;
     let captured = 0;
@@ -40,18 +43,30 @@ export async function runShell(
     };
     const killGroup = () => {
       if (!child.pid) return;
-      try { process.kill(-child.pid, 'SIGKILL'); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') child.kill('SIGKILL'); }
+      try {
+        process.kill(-child.pid, 'SIGKILL');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') child.kill('SIGKILL');
+      }
     };
-    const stop = (message: string) => { reason ??= message; killGroup(); };
+    const stop = (message: string) => {
+      reason ??= message;
+      killGroup();
+    };
     const abort = () => stop('Cancelled. The command may already have changed files; inspect before retrying.');
     const timer = setTimeout(() => stop(`Timed out after ${timeoutMs}ms. Inspect changes before retrying.`), timeoutMs);
-    const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); };
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', abort);
+    };
     child.stdout.on('data', capture);
     child.stderr.on('data', capture);
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
-    child.once('error', (error) => { cleanup(); reject(error); });
+    child.once('error', error => {
+      cleanup();
+      reject(error);
+    });
     child.once('close', (code, exitSignal) => {
       cleanup();
       killGroup(); // No persistent background jobs in v0.

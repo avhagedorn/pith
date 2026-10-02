@@ -23,17 +23,23 @@ export class SessionLog {
     const path = join(directory, `${new Date().toISOString().replaceAll(':', '-')}-${id}.jsonl`);
     const handle = await open(path, 'ax', 0o600);
     const log = new SessionLog(id, path, handle, secret);
-    try { await log.record({ type: 'session', version: 1, id, ...metadata }); }
-    catch (error) { await handle.close(); throw error; }
+    try {
+      await log.record({ type: 'session', version: 1, id, ...metadata });
+    } catch (error) {
+      await handle.close();
+      throw error;
+    }
     return log;
   }
 
-  record: RecordEvent = async (event) => {
+  record: RecordEvent = async event => {
     const line = JSON.stringify({ timestamp: Date.now(), ...event });
     await this.handle.writeFile((this.secret ? line.replaceAll(this.secret, '[REDACTED]') : line) + '\n');
     // Persist before a tool can run. No automatic crash replay in v0.
     await this.handle.sync();
   };
 
-  close(): Promise<void> { return this.handle.close(); }
+  close(): Promise<void> {
+    return this.handle.close();
+  }
 }
