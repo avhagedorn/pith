@@ -5,7 +5,6 @@ import type { RecordEvent } from './session.js';
 import type { ToolOutput, ToolSet } from './tools/index.js';
 
 export const MAX_CONTEXT_BYTES = 512 * 1024;
-export const MAX_STEPS = 20;
 const FINISHED_STOP_REASONS = new Set<string>(['stop', 'toolUse']);
 const NOT_RUN: ToolOutput = {
   text: 'Cancelled before this tool ran. Do not assume it executed.',
@@ -33,7 +32,7 @@ export interface TurnOptions {
   record: RecordEvent;
   onProgress: (notice: Notice) => void;
   signal: AbortSignal;
-  maxSteps?: number;
+  maxSteps: number;
   maxContextBytes?: number;
 }
 
@@ -45,8 +44,7 @@ export interface TurnOptions {
  * - Every tool call that enters the conversation gets a result, even when the turn is cancelled.
  */
 export async function runTurn(options: TurnOptions): Promise<RunOutcome> {
-  const { prompt, context, generate, tools, record, onProgress, signal } = options;
-  const maxSteps = options.maxSteps ?? MAX_STEPS;
+  const { prompt, context, generate, tools, record, onProgress, signal, maxSteps } = options;
   const maxContextBytes = options.maxContextBytes ?? MAX_CONTEXT_BYTES;
 
   // Logged first, so the log never trails the conversation.

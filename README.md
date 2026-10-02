@@ -35,8 +35,7 @@ Then tell it which model to use. Create `~/.config/pith/config.json`:
 ```json
 {
   "openrouterApiKey": "sk-or-...",
-  "model": "an OpenRouter model id",
-  "exaApiKey": "optional"
+  "model": "an OpenRouter model id"
 }
 ```
 
@@ -44,7 +43,16 @@ Then tell it which model to use. Create `~/.config/pith/config.json`:
 chmod 600 ~/.config/pith/config.json
 ```
 
-The model can be anything on [OpenRouter](https://openrouter.ai) that supports tool calls. The [Exa](https://exa.ai) key is for web search. Search works without one, but you'll hit rate limits. pith won't start if other users can read the file.
+The model can be anything on [OpenRouter](https://openrouter.ai) that supports tool calls. pith won't start if other users can read the file.
+
+Those two are required. The rest is optional:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `exaApiKey` | none | An [Exa](https://exa.ai) key for web search. Search works without one, but you'll hit rate limits. |
+| `reasoning` | `"low"` | How hard the model thinks: `minimal`, `low`, `medium`, `high`, `xhigh` or `max`. |
+| `maxOutputTokens` | `8192` | The most one model response can be. |
+| `maxSteps` | `20` | How many times the model can be called in one turn. |
 
 Now go to a repo and run it:
 
@@ -64,7 +72,7 @@ If the repo has an `AGENTS.md` at its root, pith reads it. That's where "use pnp
 
 Ask the model. Run the tools it asks for. Repeat until it answers in text. That's most of [`loop.ts`](src/loop.ts).
 
-A turn stops after **20 model requests** or **512 KiB** of context. Nothing gets summarised or dropped along the way. Want a fresh conversation? Quit and run it again.
+A turn stops after **20 model requests** (`maxSteps`) or **512 KiB** of context. Nothing gets summarised or dropped along the way. Want a fresh conversation? Quit and run it again.
 
 ### Six tools
 

@@ -21,6 +21,9 @@ test('config must exist, be private and hold an OpenRouter key; the Exa key is o
     openrouterApiKey: 'sk-or-x',
     model: 'a/b',
     exaApiKey: undefined,
+    reasoning: 'low',
+    maxOutputTokens: 8192,
+    maxSteps: 20,
   });
 
   await writeFile(
@@ -35,6 +38,24 @@ test('config must exist, be private and hold an OpenRouter key; the Exa key is o
   await assert.rejects(loadConfig(path), /Add "model"/);
   await writeFile(path, '{ not json');
   await assert.rejects(loadConfig(path), /not valid JSON/);
+});
+
+test('reasoning and limits come from the config, with defaults, and are validated', async t => {
+  const path = join(await fixture(t), 'config.json');
+  const write = async (extra: Record<string, unknown>) => {
+    await writeFile(path, JSON.stringify({ openrouterApiKey: 'k', model: 'a/b', ...extra }));
+    await chmod(path, 0o600);
+  };
+  await write({ reasoning: 'high', maxOutputTokens: 4000, maxSteps: 50 });
+  const { reasoning, maxOutputTokens, maxSteps } = await loadConfig(path);
+  assert.deepEqual([reasoning, maxOutputTokens, maxSteps], ['high', 4000, 50]);
+
+  await write({ reasoning: 'extreme' });
+  await assert.rejects(loadConfig(path), /"reasoning" .* must be one of: minimal, low/);
+  for (const maxSteps of [0, 2.5, '20']) {
+    await write({ maxSteps });
+    await assert.rejects(loadConfig(path), /"maxSteps" .* positive whole number/);
+  }
 });
 
 test('every secret is redacted, and missing ones are ignored', () => {

@@ -49,6 +49,7 @@ function fixture(replies: AssistantMessage[]) {
   };
   const options = {
     prompt: 'do it',
+    maxSteps: 20,
     context,
     generate,
     signal: controller.signal,
