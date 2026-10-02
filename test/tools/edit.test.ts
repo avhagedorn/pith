@@ -10,7 +10,10 @@ test('edit makes one exact replacement and keeps the file mode', async t => {
   const tools = await createTools(root, true);
   await writeFile(join(root, 'example.txt'), 'one\ntwo\nthree');
   await chmod(join(root, 'example.txt'), 0o640);
-  const result = await tools.execute(call('edit', { path: 'example.txt', oldText: 'two', newText: 'TWO' }), signal());
+  const result = await tools.execute(
+    call('edit', { path: 'example.txt', oldText: 'two', newText: 'TWO' }),
+    signal(),
+  );
   assert.equal(result.isError, false);
   assert.equal(await readFile(join(root, 'example.txt'), 'utf8'), 'one\nTWO\nthree');
   assert.deepEqual(await readdir(root), ['example.txt']);
@@ -22,7 +25,10 @@ test('ambiguous (including overlapping) or missing edits do not change files', a
   const tools = await createTools(root, true);
   await writeFile(join(root, 'a.txt'), 'aaa');
   for (const oldText of ['aa', 'missing']) {
-    const result = await tools.execute(call('edit', { path: 'a.txt', oldText, newText: 'oops' }), signal());
+    const result = await tools.execute(
+      call('edit', { path: 'a.txt', oldText, newText: 'oops' }),
+      signal(),
+    );
     assert.equal(result.isError, true);
     assert.equal(await readFile(join(root, 'a.txt'), 'utf8'), 'aaa');
   }

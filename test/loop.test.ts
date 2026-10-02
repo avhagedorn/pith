@@ -4,7 +4,12 @@ import type { AssistantMessage, Context, ToolCall } from '@earendil-works/pi-ai'
 import { runTurn, type Notice } from '../src/loop.js';
 import type { Generate } from '../src/model.js';
 
-const tool = (id = 'one'): ToolCall => ({ type: 'toolCall', id, name: 'read', arguments: { path: 'example' } });
+const tool = (id = 'one'): ToolCall => ({
+  type: 'toolCall',
+  id,
+  name: 'read',
+  arguments: { path: 'example' },
+});
 function response(
   content: AssistantMessage['content'],
   stopReason: AssistantMessage['stopReason'] = 'stop',
@@ -50,7 +55,7 @@ function fixture(replies: AssistantMessage[]) {
     record: async (e: Record<string, unknown>) => {
       events.push(structuredClone(e));
     },
-    notify: (n: Notice) => {
+    onProgress: (n: Notice) => {
       notices.push(n);
     },
     tools: {

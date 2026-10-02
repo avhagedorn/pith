@@ -12,7 +12,10 @@ test('bash runs in the workspace and reports the exit status', async t => {
   const ok = await tools.execute(call('bash', { command: 'echo hi > made.txt && ls' }), signal());
   assert.deepEqual(ok, { text: 'made.txt\n\nexit 0', isError: false });
   assert.deepEqual(await readdir(root), ['made.txt']);
-  assert.equal((await tools.execute(call('bash', { command: 'sleep 1', timeout: 121 }), signal())).isError, true);
+  assert.equal(
+    (await tools.execute(call('bash', { command: 'sleep 1', timeout: 121 }), signal())).isError,
+    true,
+  );
 });
 
 test('shell captures exit status, caps both streams, and excludes credential environment', async t => {
@@ -45,7 +48,11 @@ test('shell timeout/cancel stop the process group, including a delayed writer', 
   assert.match(timeout.text, /Timed out/);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 50);
-  const cancelled = await runShell('(sleep 0.4; echo bad > late2.txt) & wait', root, controller.signal);
+  const cancelled = await runShell(
+    '(sleep 0.4; echo bad > late2.txt) & wait',
+    root,
+    controller.signal,
+  );
   clearTimeout(timer);
   assert.equal(cancelled.isError, true);
   assert.match(cancelled.text, /Cancelled/);

@@ -1,19 +1,36 @@
 import type { ToolCall } from '@earendil-works/pi-ai';
+import * as ansi from './ansi.js';
 import type { ToolOutput } from './tools/index.js';
+
+const MARK = '◆';
+const FAILED_MARK = '✗'; // stands in for a red mark when colors are off
+const ELLIPSIS = '…';
+const BULLET = '•';
+const BAR = '│';
+const DASH = '─';
+const RULE_LENGTH = 40;
+const MARK_COLOR = { run: ansi.DIM, ok: ansi.GREEN, error: ansi.RED };
+export type RowState = keyof typeof MARK_COLOR;
 
 const lineCount = (text: unknown) =>
   typeof text === 'string' && text ? text.replace(/\n$/, '').split('\n').length : 0;
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+const dim = (text: string) => `${ansi.DIM}${text}${ansi.END_WEIGHT}`;
 
-// Sub-second durations render as "" so fast tools stay clutter-free.
+// Empty under a second, so fast tools stay uncluttered.
 export function duration(ms: number): string {
   if (!(ms >= 1000)) return '';
   const seconds = Math.round(ms / 1000);
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m${seconds % 60 ? `${seconds % 60}s` : ''}`;
+  if (seconds < 60) return `${seconds}s`;
+  const rest = seconds % 60;
+  return `${Math.floor(seconds / 60)}m${rest ? `${rest}s` : ''}`;
 }
 
+// What the call is, in one line: "$ npm test", "read src/a.ts:10-29".
 export function preview(call: ToolCall): string {
   const args = call.arguments ?? {};
   if (call.name === 'bash') return `$ ${args.command ?? '...'}`;
+
   let out = `${call.name} ${args.path ?? JSON.stringify(args)}`;
   if (call.name === 'read' && (args.offset || args.limit)) {
     const start = Number(args.offset ?? 1);
@@ -22,26 +39,42 @@ export function preview(call: ToolCall): string {
   return out;
 }
 
-// What goes in the {braces}: git-style counts for edits, otherwise a result gist and duration.
+// What goes in the {braces}: line counts for edits, otherwise a gist of the result and how long.
 export function detail(call: ToolCall, result: ToolOutput, ms: number): string {
   const args = call.arguments ?? {};
-  if (!result.isError && call.name === 'edit') return `+${lineCount(args.newText)}/-${lineCount(args.oldText)}`;
+  if (!result.isError && call.name === 'edit') {
+    return `+${lineCount(args.newText)}/-${lineCount(args.oldText)}`;
+  }
   if (!result.isError && call.name === 'write') return `+${lineCount(args.content)}/-0`;
+
   const lines = result.text.split('\n').filter(line => line.trim());
-  if (call.name === 'bash' && !result.isError) lines.pop(); // trailing "exit 0"
-  const gist = result.isError ? lines.at(-1) : lines.length > 1 ? `${lines.length} lines` : lines[0];
+  if (call.name === 'bash' && !result.isError) lines.pop(); // the trailing "exit 0"
+  // A failure's last line says the most: "exit 1", "oldText not found."
+  const gist = result.isError
+    ? lines.at(-1)
+    : lines.length > 1
+      ? `${lines.length} lines`
+      : lines[0];
   return [gist, duration(ms)].filter(Boolean).join(' · ');
 }
 
-// One status row, cut to the terminal width so it never wraps.
-export function row(text: string, state: 'run' | 'ok' | 'error', color: boolean, width: number): string {
+const DIFF_COUNTS = /\{\+(\d+)\/-(\d+)\}$/;
+const COLORED_DIFF_COUNTS = `{${ansi.GREEN}+$1${ansi.END_COLOR}/${ansi.RED}-$2${ansi.END_COLOR}}`;
+
+// One tool row, cut to the terminal width so it can never wrap.
+export function row(text: string, state: RowState, color: boolean, width: number): string {
+  const room = width - `${MARK} `.length;
   let body = text.replace(/\s+/g, ' ').trim();
-  if (body.length > width - 2) body = `${body.slice(0, Math.max(0, width - 3))}…`;
-  if (!color) return `${state === 'error' ? '✗' : '◆'} ${body}`;
-  body = body.replace(/\{\+(\d+)\/-(\d+)\}$/, '{\x1b[32m+$1\x1b[39m/\x1b[31m-$2\x1b[39m}');
-  const mark = { run: 2, ok: 32, error: 31 }[state];
-  return `\x1b[${mark}m◆\x1b[0m ${state === 'error' ? body : `\x1b[2m${body}\x1b[0m`}`;
+  if (body.length > room) body = body.slice(0, Math.max(0, room - 1)) + ELLIPSIS;
+  if (!color) return `${state === 'error' ? FAILED_MARK : MARK} ${body}`;
+
+  body = body.replace(DIFF_COUNTS, COLORED_DIFF_COUNTS);
+  const mark = `${MARK_COLOR[state]}${MARK}${ansi.RESET}`;
+  return `${mark} ${state === 'error' ? body : `${ansi.DIM}${body}${ansi.RESET}`}`;
 }
+
+// A full-width line with text set into its left end: "── text ─────".
+export const rule = (text: string, width: number) => `${DASH}${DASH} ${text} `.padEnd(width, DASH);
 
 export interface TurnStats {
   reads: Set<string>;
@@ -60,72 +93,98 @@ export const newStats = (): TurnStats => ({
   startedAt: Date.now(),
 });
 
+// "Read 2 files, edited 1 file, ran 3 commands, 1 failed · 42s · ~$0.0009"
 export function summary(stats: TurnStats, ms: number): string {
-  const parts = [
-    stats.reads.size && `read ${stats.reads.size} file${stats.reads.size === 1 ? '' : 's'}`,
-    stats.edits.size && `edited ${stats.edits.size} file${stats.edits.size === 1 ? '' : 's'}`,
-    stats.commands && `ran ${stats.commands} command${stats.commands === 1 ? '' : 's'}`,
+  const activity = [
+    stats.reads.size && `read ${plural(stats.reads.size, 'file')}`,
+    stats.edits.size && `edited ${plural(stats.edits.size, 'file')}`,
+    stats.commands && `ran ${plural(stats.commands, 'command')}`,
     stats.failed && `${stats.failed} failed`,
   ]
     .filter(Boolean)
     .join(', ');
-  return [parts && parts[0]!.toUpperCase() + parts.slice(1), duration(ms), `~$${stats.cost.toFixed(4)}`]
-    .filter(Boolean)
-    .join(' · ');
+  const capitalized = activity && activity[0]!.toUpperCase() + activity.slice(1);
+  return [capitalized, duration(ms), `~$${stats.cost.toFixed(4)}`].filter(Boolean).join(' · ');
 }
 
-// Inline spans. Code spans are split out first so nothing inside them is restyled.
-// Underscore emphasis needs word boundaries (snake_case); asterisks need a non-space inside ("2 * 3").
+const FENCE = /^\s*```/;
+const HEADING = /^#{1,6}\s+(.*)$/;
+const HEADING_MARKERS = /\*\*|__|`/g;
+const HORIZONTAL_RULE = /^\s*([-*_])(\s*\1){2,}\s*$/;
+const QUOTE = /^\s*>\s?(.*)$/;
+const TABLE_ROW = /^\s*\|/;
+const TABLE_DIVIDER = /^[\s|:-]+$/;
+const LIST_ITEM = /^(\s*)[-*+]\s+/;
+const CODE_SPAN = /(`[^`]+`)/;
+const LINK = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+const STRIKETHROUGH = /(?<!\\)~~(?=\S)(.+?)(?<=[^\s\\])~~/g;
+const ESCAPED = /\\([*_~`\\[\]#>|-])/g;
+const EMPHASIS_CHARACTERS = /[*_~]/g;
+
+// Emphasised text starts and ends on a non-space ("2 * 3" is not italic) and is not escaped.
+// Underscores also need word boundaries, so snake_case is left alone.
+const INSIDE = '(?=\\S)(.+?)(?<=[^\\s\\\\])';
+const emphasis = (length: number, on: string, off: string) => ({
+  stars: new RegExp(`(?<![\\\\*])\\*{${length}}${INSIDE}\\*{${length}}(?!\\*)`, 'g'),
+  underscores: new RegExp(`(?<![\\w_\\\\])_{${length}}${INSIDE}_{${length}}(?![\\w_])`, 'g'),
+  styled: `${on}$1${off}`,
+});
+// Longest marker first, so *** is not read as ** plus *.
+const EMPHASIS = [
+  emphasis(3, ansi.BOLD_ITALIC, ansi.END_BOLD_ITALIC),
+  emphasis(2, ansi.BOLD, ansi.END_WEIGHT),
+  emphasis(1, ansi.ITALIC, ansi.END_ITALIC),
+];
+
 function inline(text: string): string {
-  const span = (input: string, mark: string, on: string, off: string) =>
-    input
-      .replace(
-        new RegExp(`(?<![\\\\*])\\*{${mark.length}}(?=\\S)(.+?)(?<=[^\\s\\\\])\\*{${mark.length}}(?!\\*)`, 'g'),
-        `\x1b[${on}m$1\x1b[${off}m`,
-      )
-      .replace(
-        new RegExp(`(?<![\\w_\\\\])_{${mark.length}}(?=\\S)(.+?)(?<=[^\\s\\\\])_{${mark.length}}(?![\\w_])`, 'g'),
-        `\x1b[${on}m$1\x1b[${off}m`,
-      );
-  return text
-    .split(/(`[^`]+`)/)
-    .map((part, i) => {
-      if (i % 2) return `\x1b[36m${part.slice(1, -1)}\x1b[39m`;
-      part = part.replace(
-        /\[([^\]]+)\]\(([^)\s]+)\)/g,
-        (_, label, url) => `\x1b[4m${label}\x1b[24m \x1b[2m(${url.replace(/[*_~]/g, '\\$&')})\x1b[22m`,
-      );
-      part = span(span(span(part, '***', '1;3', '22;23'), '**', '1', '22'), '*', '3', '23');
-      return part
-        .replace(/(?<!\\)~~(?=\S)(.+?)(?<=[^\s\\])~~/g, '\x1b[9m$1\x1b[29m')
-        .replace(/\\([*_~`\\[\]#>|-])/g, '$1');
-    })
-    .join('');
+  // Splitting on code spans leaves them at the odd indexes, where nothing restyles them.
+  const parts = text.split(CODE_SPAN).map((part, index) => {
+    if (index % 2) return `${ansi.CYAN}${part.slice(1, -1)}${ansi.END_COLOR}`;
+
+    // Emphasis characters in a URL are escaped so the passes below skip them.
+    let styled = part.replace(LINK, (_, label: string, url: string) => {
+      const literalUrl = url.replace(EMPHASIS_CHARACTERS, '\\$&');
+      return `${ansi.UNDERLINE}${label}${ansi.END_UNDERLINE} ${dim(`(${literalUrl})`)}`;
+    });
+    for (const { stars, underscores, styled: replacement } of EMPHASIS) {
+      styled = styled.replace(stars, replacement).replace(underscores, replacement);
+    }
+    return styled
+      .replace(STRIKETHROUGH, `${ansi.STRIKE}$1${ansi.END_STRIKE}`)
+      .replace(ESCAPED, '$1');
+  });
+  return parts.join('');
 }
 
-// Styles model markdown one completed line at a time; the only state is whether we are inside a code fence.
-// Handles headings, emphasis, strikethrough, code, links, quotes, rules, bullets and table pipes.
-// Not attempted: table column alignment, checkboxes, images, HTML, multi-line emphasis.
+/**
+ * Styles model markdown one finished line at a time. The only state is whether the line is
+ * inside a code fence. Not attempted: table alignment, checkboxes, images, HTML and emphasis
+ * that spans lines.
+ */
 export function markdownStyler(color: boolean): (line: string) => string {
-  let fence = false;
   if (!color) return line => line;
-  const dim = (text: string) => `\x1b[2m${text}\x1b[22m`;
+
+  let inFence = false;
   return line => {
-    if (/^\s*```/.test(line)) {
-      fence = !fence;
+    if (FENCE.test(line)) {
+      inFence = !inFence;
       return dim(line);
     }
-    if (fence) return `\x1b[36m${line}\x1b[0m`;
-    const heading = /^#{1,6}\s+(.*)$/.exec(line);
-    if (heading) return `\x1b[1;33m${heading[1]!.replace(/\*\*|__|`/g, '')}\x1b[0m`;
-    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) return dim('─'.repeat(40));
-    const quote = /^\s*>\s?(.*)$/.exec(line);
-    if (quote) return `${dim('│')} \x1b[3m${inline(quote[1]!)}\x1b[23m`;
-    if (/^\s*\|/.test(line)) {
-      return /^[\s|:-]+$/.test(line)
-        ? dim(line.replace(/\|/g, '│').replace(/[:-]/g, '─'))
-        : inline(line).replace(/\|/g, dim('│'));
+    if (inFence) return `${ansi.CYAN}${line}${ansi.RESET}`;
+
+    const heading = HEADING.exec(line);
+    if (heading) {
+      return `${ansi.BOLD_YELLOW}${heading[1]!.replace(HEADING_MARKERS, '')}${ansi.RESET}`;
     }
-    return inline(line.replace(/^(\s*)[-*+]\s+/, '$1• '));
+    if (HORIZONTAL_RULE.test(line)) return dim(DASH.repeat(RULE_LENGTH));
+
+    const quote = QUOTE.exec(line);
+    if (quote) return `${dim(BAR)} ${ansi.ITALIC}${inline(quote[1]!)}${ansi.END_ITALIC}`;
+
+    if (TABLE_ROW.test(line)) {
+      if (TABLE_DIVIDER.test(line)) return dim(line.replace(/\|/g, BAR).replace(/[:-]/g, DASH));
+      return inline(line).replace(/\|/g, dim(BAR));
+    }
+    return inline(line.replace(LIST_ITEM, `$1${BULLET} `));
   };
 }

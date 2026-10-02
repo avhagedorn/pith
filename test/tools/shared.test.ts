@@ -15,10 +15,18 @@ test('workspace paths reject traversal and symlinks to outside files/directories
   for (const path of ['../secret.txt', join(outside, 'secret.txt'), 'escape/secret.txt']) {
     assert.equal((await tools.execute(call('read', { path }), signal())).isError, true);
   }
-  assert.equal((await tools.execute(call('write', { path: 'escape/new.txt', content: 'no' }), signal())).isError, true);
   assert.equal(
-    (await tools.execute(call('edit', { path: 'escape/secret.txt', oldText: 'not', newText: 'now' }), signal()))
+    (await tools.execute(call('write', { path: 'escape/new.txt', content: 'no' }), signal()))
       .isError,
+    true,
+  );
+  assert.equal(
+    (
+      await tools.execute(
+        call('edit', { path: 'escape/secret.txt', oldText: 'not', newText: 'now' }),
+        signal(),
+      )
+    ).isError,
     true,
   );
   assert.deepEqual(await readdir(outside), ['secret.txt']);

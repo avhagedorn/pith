@@ -12,7 +12,10 @@ test('read numbers lines, honours offset/limit and points at the next offset', a
   const root = await fixture(t);
   const tools = await createTools(root, false);
   await writeFile(join(root, 'example.txt'), 'one\ntwo\nthree');
-  const window = await tools.execute(call('read', { path: 'example.txt', offset: 2, limit: 1 }), signal());
+  const window = await tools.execute(
+    call('read', { path: 'example.txt', offset: 2, limit: 1 }),
+    signal(),
+  );
   assert.equal(window.text, '2: two\n[more lines: next offset 3]');
   const whole = await tools.execute(call('read', { path: 'example.txt' }), signal());
   assert.deepEqual(whole, { text: '1: one\n2: two\n3: three', isError: false });

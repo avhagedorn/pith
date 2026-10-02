@@ -37,7 +37,10 @@ test('saved OpenRouter key is reused without modifying the Pi file or exposing o
 test('supports a saved env-var reference; refuses credential commands, OAuth and missing keys', async t => {
   const path = join(await fixture(t), 'auth.json');
   await writeFile(path, JSON.stringify({ openrouter: { type: 'api_key', key: 'MY_ROUTER_KEY' } }));
-  assert.equal((await resolveKey({ MY_ROUTER_KEY: 'sk-or-test-only' }, path)).key, 'sk-or-test-only');
+  assert.equal(
+    (await resolveKey({ MY_ROUTER_KEY: 'sk-or-test-only' }, path)).key,
+    'sk-or-test-only',
+  );
   for (const credential of [
     { type: 'api_key', key: '!echo dangerous' },
     { type: 'oauth', access: 'secret' },

@@ -10,7 +10,10 @@ test('four tools only when local execution is explicitly enabled', async t => {
     readonly.definitions.map(t => t.name),
     ['read'],
   );
-  assert.equal((await readonly.execute(call('bash', { command: 'echo denied' }), signal())).isError, true);
+  assert.equal(
+    (await readonly.execute(call('bash', { command: 'echo denied' }), signal())).isError,
+    true,
+  );
   assert.deepEqual(
     (await createTools(root, true)).definitions.map(t => t.name),
     ['read', 'write', 'edit', 'bash'],

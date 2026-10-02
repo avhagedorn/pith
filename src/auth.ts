@@ -1,42 +1,48 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { errorCode } from './errors.js';
 
+const KEY_VARIABLE = 'OPENROUTER_API_KEY';
+const KEY_PREFIX = 'sk-or-';
+const COMMAND_PREFIX = '!';
+const PI_AUTH_PATH = join(homedir(), '.pi', 'agent', 'auth.json');
+const REDACTED = '[REDACTED]';
+
+export const redact = (text: string, key: string) => (key ? text.replaceAll(key, REDACTED) : text);
+
+// Environment first, then Pi's saved credential. Pi's file is only ever read.
 export async function resolveKey(
   env: NodeJS.ProcessEnv = process.env,
-  authPath = join(homedir(), '.pi', 'agent', 'auth.json'),
+  authPath = PI_AUTH_PATH,
 ): Promise<{ key: string; source: string }> {
-  const direct = env.OPENROUTER_API_KEY?.trim();
-  if (direct) return { key: direct, source: 'OPENROUTER_API_KEY' };
+  const fromEnv = env[KEY_VARIABLE]?.trim();
+  if (fromEnv) return { key: fromEnv, source: KEY_VARIABLE };
 
-  let data: unknown;
+  const saved = await savedCredential(authPath);
+  if (saved?.startsWith(COMMAND_PREFIX)) {
+    throw new Error(
+      `Pi uses a credential command. Export ${KEY_VARIABLE}; pith does not execute auth commands.`,
+    );
+  }
+  // Pi saves either the key or the name of a variable holding it.
+  const key = saved && (env[saved]?.trim() || (saved.startsWith(KEY_PREFIX) ? saved : undefined));
+  if (key) return { key, source: 'Pi openrouter credential (read-only)' };
+
+  throw new Error(
+    `No OpenRouter API key. Set ${KEY_VARIABLE} or store an API key for openrouter in Pi.`,
+  );
+}
+
+// Only the openrouter API-key entry counts. OAuth and other providers are ignored.
+async function savedCredential(path: string): Promise<string | undefined> {
+  let file: { openrouter?: { type?: unknown; key?: unknown } } | null;
   try {
-    data = JSON.parse(await readFile(authPath, 'utf8'));
+    file = JSON.parse(await readFile(path, 'utf8'));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw new Error('Cannot read Pi credentials. Set OPENROUTER_API_KEY instead.');
-    }
+    if (errorCode(error) === 'ENOENT') return undefined;
+    throw new Error(`Cannot read Pi credentials. Set ${KEY_VARIABLE} instead.`);
   }
-  if (data && typeof data === 'object' && 'openrouter' in data) {
-    const credential = data.openrouter;
-    if (
-      credential &&
-      typeof credential === 'object' &&
-      'type' in credential &&
-      credential.type === 'api_key' &&
-      'key' in credential &&
-      typeof credential.key === 'string'
-    ) {
-      const configured = credential.key.trim();
-      // Only this provider's key. No credential commands, OAuth, writes or copies.
-      if (configured.startsWith('!')) {
-        throw new Error(
-          'Pi uses a credential command. Export OPENROUTER_API_KEY; pith does not execute auth commands.',
-        );
-      }
-      const key = env[configured]?.trim() || (configured.startsWith('sk-or-') ? configured : undefined);
-      if (key) return { key, source: 'Pi openrouter credential (read-only)' };
-    }
-  }
-  throw new Error('No OpenRouter API key. Set OPENROUTER_API_KEY or store an API key for openrouter in Pi.');
+  const entry = file?.openrouter;
+  return entry?.type === 'api_key' && typeof entry.key === 'string' ? entry.key.trim() : undefined;
 }
