@@ -4,18 +4,7 @@ A small coding agent for your terminal.
 
 It asks a model what to do, runs the tools the model asks for, and keeps going until it has an answer. That's the whole thing: about **1,600 lines** of TypeScript, six tools, no TUI.
 
-```text
-❯ fix the add bug
-
-◆ 2× read test.mjs {4 lines}
-◆ $ node test.mjs {exit 1}
-◆ edit add.mjs {+1/-1}
-◆ $ node test.mjs {PASS}
-
-add.mjs used a - b instead of a + b. Fixed, and the test passes.
-
-── Read 2 files, edited 1 file, ran 2 commands, 1 failed · 5s · ~$0.0004 ──────
-```
+![pith finding and fixing a failing test, then searching the web](docs/demo.gif)
 
 ## Try it
 
