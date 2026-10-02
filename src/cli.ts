@@ -36,7 +36,7 @@ Usage: pith [--cwd PATH] ["task"]
 
 Model: ${PROVIDER} / ${MODEL_ID} (fixed; no model fallback)
 Auth: OPENROUTER_API_KEY, then Pi's saved OpenRouter API-key credential (read-only)
-Interactive: /new clears context, /exit quits, Ctrl-C cancels a run.
+Ctrl-C cancels a run, or quits at the prompt. Each launch is a new conversation.
 Logs: ~/.local/state/pith/sessions/ (private JSONL; no disk resume yet)
 
 The tools (read, write, edit, bash) run with your OS permissions. bash is NOT sandboxed.
@@ -142,7 +142,7 @@ async function main() {
     try {
       return await readline.question(`\n${tint}${PROMPT_MARK}`, { signal });
     } catch (error) {
-      if (signal.aborted) return undefined; // Ctrl-C or Ctrl-D at the prompt means quit
+      if (signal.aborted) return undefined;
       throw error;
     } finally {
       readline.close();
@@ -173,28 +173,16 @@ async function main() {
 
   process.on('SIGINT', interrupt);
   try {
-    term.status(
-      `pith · ${MODEL_ID}\nworkspace: ${cwd}\nauth: ${auth.source}\nsession: ${log.path}`,
-    );
-    if (instructions) term.status(`instructions: ${INSTRUCTIONS_FILE}`);
-    term.status('bash is unsandboxed. Review changes.');
-
     if (!interactive) {
       process.exitCode = EXIT_CODE[(await runPrompt(task)).reason];
       return;
     }
 
-    term.status('/new · /exit · Ctrl-C to cancel a run; typing during a run is discarded.');
+    // Ctrl-C or Ctrl-D at the prompt quits. A new conversation is a new launch.
     while (!outputClosed.signal.aborted) {
       const prompt = (await ask())?.trim();
-      if (prompt === undefined || prompt === '/exit') break;
-      if (prompt === '/new') {
-        await log.record({ type: 'context_reset' });
-        context.messages = [];
-        term.status('context cleared; earlier messages remain in the audit log.');
-      } else if (prompt) {
-        await runPrompt(prompt);
-      }
+      if (prompt === undefined) break;
+      if (prompt) await runPrompt(prompt);
     }
   } finally {
     process.removeListener('SIGINT', interrupt);

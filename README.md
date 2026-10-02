@@ -25,7 +25,7 @@ Ask the model. Run the tools it asks for. Repeat until it answers in text.
 
 Only a complete response can run tools. Every tool call gets a result, even if you cancel halfway. That's most of [`loop.ts`](src/loop.ts).
 
-A turn stops after **20 model requests** or **512 KiB** of context. Nothing is summarised or pruned behind your back; `/new` starts fresh.
+A turn stops after **20 model requests** or **512 KiB** of context. Nothing is summarised or pruned behind your back. For a fresh conversation, quit and relaunch.
 
 ### Four tools
 
@@ -44,7 +44,7 @@ File tools stay inside the workspace. Files are capped at **2 MiB** and tool res
 
 ### What you see
 
-Each tool call is one dim row with a diamond: grey while running, green when it works, red when it doesn't. Repeats of the same tool share a row. Edits show line counts instead of a diff.
+Each tool call is one dim row with a diamond: blinking while it runs, green when it works, red when it doesn't. Repeats of the same tool share a row. Edits show line counts instead of a diff.
 
 Model text prints a line at a time with light markdown styling. A blank line separates it from the tool rows above and from the one-line summary that ends each turn.
 
@@ -82,7 +82,7 @@ pith --check                  # check setup; no request, no cost
 
 It needs an OpenRouter key: `OPENROUTER_API_KEY`, or the one [Pi](https://pi.dev) already saved in `~/.pi/agent/auth.json`. Pi's file is read, never written.
 
-`/new` clears the conversation. `/exit` quits.
+Ctrl-C at the prompt quits. There are no slash commands and no startup banner; `pith --check` shows the model, key source and tools.
 
 If the workspace has an `AGENTS.md` at its root, it's added to the system prompt. That's where "use pnpm" and "run tests with X" go.
 
