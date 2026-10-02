@@ -159,6 +159,7 @@ cd ~/dev/pith
 npm ci --ignore-scripts
 npm run build
 npm test
+npm run format   # Biome, formatter only; format:check for a dry run
 ```
 
 `pith` runs the compiled code while preserving your current working directory. Rebuild after changing TypeScript. No global installation or shell-profile modification is needed.
