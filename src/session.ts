@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, open, type FileHandle } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { redact } from './auth.js';
+import { redact } from './config.js';
 
 const SESSIONS_DIRECTORY = join(homedir(), '.local', 'state', 'pith', 'sessions');
 const LOG_VERSION = 1;
@@ -17,12 +17,12 @@ export class SessionLog {
     public readonly id: string,
     public readonly path: string,
     private readonly handle: FileHandle,
-    private readonly secret: string,
+    private readonly secrets: (string | undefined)[],
   ) {}
 
   static async create(
     metadata: Record<string, unknown>,
-    secret: string,
+    secrets: (string | undefined)[],
     directory = SESSIONS_DIRECTORY,
   ): Promise<SessionLog> {
     await mkdir(directory, { recursive: true, mode: OWNER_ONLY_DIRECTORY });
@@ -30,7 +30,7 @@ export class SessionLog {
     const startedAt = new Date().toISOString().replaceAll(':', '-');
     const path = join(directory, `${startedAt}-${id}.jsonl`);
     const handle = await open(path, 'ax', OWNER_ONLY_FILE);
-    const log = new SessionLog(id, path, handle, secret);
+    const log = new SessionLog(id, path, handle, secrets);
     try {
       await log.record({ type: 'session', version: LOG_VERSION, id, ...metadata });
     } catch (error) {
@@ -42,7 +42,7 @@ export class SessionLog {
 
   record: RecordEvent = async event => {
     const line = JSON.stringify({ timestamp: Date.now(), ...event });
-    await this.handle.writeFile(`${redact(line, this.secret)}\n`);
+    await this.handle.writeFile(`${redact(line, this.secrets)}\n`);
     // Synced, so a tool never runs ahead of its start marker.
     await this.handle.sync();
   };

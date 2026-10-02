@@ -2,7 +2,7 @@
 
 A coding agent small enough to read in one sitting.
 
-One model, four tools, one loop. About 1,500 lines of TypeScript on top of [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai). It runs in a plain terminal: no TUI, no plugins, no server.
+One model, six tools, one loop. About 1,600 lines of TypeScript on top of [pi-ai](https://www.npmjs.com/package/@earendil-works/pi-ai). It runs in a plain terminal: no TUI, no plugins, no server.
 
 ```text
 ❯ fix the add bug
@@ -27,7 +27,7 @@ Only a complete response can run tools. Every tool call gets a result, even if y
 
 A turn stops after **20 model requests** or **512 KiB** of context. Nothing is summarised or pruned behind your back. For a fresh conversation, quit and relaunch.
 
-### Four tools
+### Six tools
 
 | Tool | What it does |
 |---|---|
@@ -35,6 +35,8 @@ A turn stops after **20 model requests** or **512 KiB** of context. Nothing is s
 | `write` | Creates or replaces a file, via a temporary file and a rename. |
 | `edit` | One exact search and replace. Missing or ambiguous matches fail and change nothing. |
 | `bash` | `/bin/bash -c` in the workspace. 30 s timeout by default, 120 s at most. |
+| `search` | Web search. Titles, URLs and excerpts. No API key. |
+| `fetch` | A web page as plain text, 20,000 characters at a time. |
 
 File tools stay inside the workspace. Files are capped at **2 MiB** and tool results at **32 KiB**. When a command prints more than that, the middle is dropped and both ends are kept, since the error is usually at the bottom. Calls run one at a time.
 
@@ -58,6 +60,10 @@ Not by itself. **The shell tool runs commands with your permissions and no sandb
 
 The path checks stop the file tools from wandering out of the workspace by accident. The shell isn't bound by them. It can read your home directory and reach the network. It doesn't inherit the API key, which limits exposure and isn't isolation.
 
+Web pages are written by strangers, and the agent that reads them can also run commands. Everything `search` and `fetch` return is fenced and labelled as untrusted, and the model is told to treat it as data. That makes it harder for a page to hijack the agent. It doesn't make it impossible.
+
+Searches go to [Exa](https://exa.ai)'s hosted endpoint, anonymously unless you give it a key. Apart from the model itself, it's the only service pith talks to on its own.
+
 Use a disposable checkout or a container for anything you don't trust, and review `git diff`. pith never commits or pushes.
 
 ## Try it
@@ -80,9 +86,18 @@ pith "fix the failing test"   # one task, then exit
 pith --check                  # check setup; no request, no cost
 ```
 
-It needs an OpenRouter key: `OPENROUTER_API_KEY`, or the one [Pi](https://pi.dev) already saved in `~/.pi/agent/auth.json`. Pi's file is read, never written.
+Keys go in `~/.config/pith/config.json`, and nowhere else:
 
-Ctrl-C at the prompt quits. There are no slash commands and no startup banner; `pith --check` shows the model, key source and tools.
+```json
+{
+  "openrouterApiKey": "sk-or-...",
+  "exaApiKey": "..."
+}
+```
+
+The [OpenRouter](https://openrouter.ai) key is required. The [Exa](https://exa.ai) key is optional: search works without one, but anonymous use is rate limited. The file must be private (`chmod 600`), or pith refuses to start.
+
+Ctrl-C at the prompt quits. There are no slash commands and no startup banner; `pith --check` shows the model, tools and config path.
 
 If the workspace has an `AGENTS.md` at its root, it's added to the system prompt. That's where "use pnpm" and "run tests with X" go.
 
@@ -90,7 +105,7 @@ If the workspace has an `AGENTS.md` at its root, it's added to the system prompt
 
 Resume a session, compact context, sandbox anything, read images, run tools in parallel, switch models, or take plugins.
 
-Checkboxes aren't rendered. Windows isn't supported.
+Checkboxes aren't rendered. Pages that need JavaScript come back mostly empty. Windows isn't supported.
 
 ## Development
 
@@ -106,7 +121,7 @@ src/
   cli.ts          arguments, setup and the prompt loop
   loop.ts         the agent loop
   model.ts        the pinned model
-  auth.ts         finding the API key
+  config.ts       the config file and its keys
   session.ts      the audit log
   instructions.ts loading AGENTS.md
   transcript.ts   progress events → what you see
