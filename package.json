@@ -11,9 +11,9 @@
     "pith": "dist/src/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "start": "node dist/src/cli.js",
-    "test": "npm run build && node --test dist/test/*.test.js",
+    "test": "npm run build && node --test 'dist/test/**/*.test.js'",
     "check": "tsc --noEmit",
     "format": "biome format --write",
     "format:check": "biome format"
