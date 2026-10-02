@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createTools, workspacePath } from '../src/tools.js';
-import { runShell, shellEnvironment, MAX_OUTPUT_BYTES } from '../src/shell.js';
+import { createTools } from '../src/tools/index.js';
+import { MAX_OUTPUT_BYTES, workspacePath } from '../src/tools/shared.js';
+import { runShell, shellEnvironment } from '../src/tools/bash/shell.js';
 import type { ToolCall } from '@earendil-works/pi-ai';
 
 const signal = () => new AbortController().signal;

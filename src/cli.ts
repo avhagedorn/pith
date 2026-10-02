@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline/promises';
 import type { Context } from '@earendil-works/pi-ai';
 import { resolveKey } from './auth.js';
 import { createModel, MODEL_ID } from './model.js';
-import { createTools } from './tools.js';
+import { createTools } from './tools/index.js';
 import { SessionLog } from './session.js';
 import { runTurn, type Notice } from './loop.js';
 import { detail, markdownStyler, newStats, preview, row, summary } from './render.js';

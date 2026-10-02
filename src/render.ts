@@ -1,5 +1,5 @@
 import type { ToolCall } from '@earendil-works/pi-ai';
-import type { ToolOutput } from './tools.js';
+import type { ToolOutput } from './tools/index.js';
 
 const lineCount = (text: unknown) =>
   typeof text === 'string' && text ? text.replace(/\n$/, '').split('\n').length : 0;

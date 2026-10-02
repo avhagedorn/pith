@@ -144,8 +144,13 @@ src/
   auth.ts      environment / read-only Pi credential lookup
   model.ts     fixed OpenRouter model and streaming adapter
   loop.ts      the orchestration loop
-  tools.ts     schemas, file tools and dispatch
-  shell.ts     bounded subprocess execution and cancellation
+  tools/
+    index.ts     registry and dispatch
+    shared.ts    limits, workspace path check, bounded file I/O, defineTool
+    read/        index.ts
+    write/       index.ts
+    edit/        index.ts
+    bash/        index.ts, shell.ts (bounded subprocess execution and cancellation)
   session.ts   private append-only audit log
 prompt.md      the entire base system prompt
 ```

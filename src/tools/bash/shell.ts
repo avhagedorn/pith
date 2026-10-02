@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
-
-export const MAX_OUTPUT_BYTES = 32 * 1024;
+import { MAX_OUTPUT_BYTES } from '../shared.js';
 
 // Do not hand the model's subprocess all of the harness's credentials.
 // This is exposure reduction, NOT isolation: a local shell can still read HOME.

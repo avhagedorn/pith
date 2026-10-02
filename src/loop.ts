@@ -1,7 +1,7 @@
 import type { Context, Message, ToolCall, ToolResultMessage, Usage } from '@earendil-works/pi-ai';
 import type { Generate } from './model.js';
 import type { RecordEvent } from './session.js';
-import type { ToolOutput, ToolSet } from './tools.js';
+import type { ToolOutput, ToolSet } from './tools/index.js';
 
 export const MAX_CONTEXT_BYTES = 512 * 1024;
 export const MAX_STEPS = 20;
