@@ -4,6 +4,8 @@ import { detail, markdownStyler, newStats, preview, rule, summary } from './rend
 import type { Terminal } from './terminal.js';
 import type { ToolOutput } from './tools/index.js';
 
+const WEB_TOOLS = new Set(['search', 'fetch']);
+
 interface Burst {
   name: string;
   count: number;
@@ -57,8 +59,11 @@ export function createTranscript(term: Terminal) {
     const ms = toolStartedAt ? Date.now() - toolStartedAt : 0;
     toolStartedAt = 0;
 
+    const path = String(call.arguments?.path);
     if (call.name === 'bash') stats.commands++;
-    else (call.name === 'read' ? stats.reads : stats.edits).add(String(call.arguments?.path));
+    else if (call.name === 'read') stats.reads.add(path);
+    else if (WEB_TOOLS.has(call.name)) stats.lookups++;
+    else stats.edits.add(path);
     if (result.isError) stats.failed++;
 
     // A failure never joins a burst, so it always keeps a row of its own.

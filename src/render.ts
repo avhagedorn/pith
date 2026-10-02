@@ -31,6 +31,8 @@ export function duration(ms: number): string {
 export function preview(call: ToolCall): string {
   const args = call.arguments ?? {};
   if (call.name === 'bash') return `$ ${args.command ?? '...'}`;
+  if (call.name === 'search') return `search ${args.query ?? '...'}`;
+  if (call.name === 'fetch') return `fetch ${args.url ?? '...'}`;
 
   let out = `${call.name} ${args.path ?? JSON.stringify(args)}`;
   if (call.name === 'read' && (args.offset || args.limit)) {
@@ -82,6 +84,7 @@ export interface TurnStats {
   reads: Set<string>;
   edits: Set<string>;
   commands: number;
+  lookups: number;
   failed: number;
   cost: number;
   startedAt: number;
@@ -90,6 +93,7 @@ export const newStats = (): TurnStats => ({
   reads: new Set(),
   edits: new Set(),
   commands: 0,
+  lookups: 0,
   failed: 0,
   cost: 0,
   startedAt: Date.now(),
@@ -101,6 +105,7 @@ export function summary(stats: TurnStats, ms: number): string {
     stats.reads.size && `read ${plural(stats.reads.size, 'file')}`,
     stats.edits.size && `edited ${plural(stats.edits.size, 'file')}`,
     stats.commands && `ran ${plural(stats.commands, 'command')}`,
+    stats.lookups && `${plural(stats.lookups, 'web lookup')}`,
     stats.failed && `${stats.failed} failed`,
   ]
     .filter(Boolean)

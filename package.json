@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A plain-terminal coding agent: one model, four tools, one loop.",
+  "description": "A plain-terminal coding agent: one model, six tools, one loop.",
   "engines": {
     "node": ">=22.19.0"
   },
