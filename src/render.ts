@@ -3,13 +3,14 @@ import * as ansi from './ansi.js';
 import type { ToolOutput } from './tools/index.js';
 
 const MARK = '◆';
+const HOLLOW_MARK = '◇'; // the off beat of a running row's blink
 const FAILED_MARK = '✗'; // stands in for a red mark when colors are off
 const ELLIPSIS = '…';
 const BULLET = '•';
 const BAR = '│';
 const DASH = '─';
 const RULE_LENGTH = 40;
-const MARK_COLOR = { run: ansi.DIM, ok: ansi.GREEN, error: ansi.RED };
+const MARK_COLOR = { run: ansi.DIM, wait: ansi.DIM, ok: ansi.GREEN, error: ansi.RED };
 export type RowState = keyof typeof MARK_COLOR;
 
 const lineCount = (text: unknown) =>
@@ -66,10 +67,11 @@ export function row(text: string, state: RowState, color: boolean, width: number
   const room = width - `${MARK} `.length;
   let body = text.replace(/\s+/g, ' ').trim();
   if (body.length > room) body = body.slice(0, Math.max(0, room - 1)) + ELLIPSIS;
-  if (!color) return `${state === 'error' ? FAILED_MARK : MARK} ${body}`;
+  const glyph = state === 'wait' ? HOLLOW_MARK : MARK;
+  if (!color) return `${state === 'error' ? FAILED_MARK : glyph} ${body}`;
 
   body = body.replace(DIFF_COUNTS, COLORED_DIFF_COUNTS);
-  const mark = `${MARK_COLOR[state]}${MARK}${ansi.RESET}`;
+  const mark = `${MARK_COLOR[state]}${glyph}${ansi.RESET}`;
   return `${mark} ${state === 'error' ? body : `${ansi.DIM}${body}${ansi.RESET}`}`;
 }
 

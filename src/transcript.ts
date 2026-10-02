@@ -94,7 +94,7 @@ export function createTranscript(term: Terminal) {
         case 'tool-start':
           endText();
           toolStartedAt = Date.now();
-          term.row(`${preview(notice.call)} {running}`, 'run', 'transient');
+          term.row(preview(notice.call), 'run', 'transient');
           break;
         case 'tool-end':
           toolEnded(notice.call, notice.result);

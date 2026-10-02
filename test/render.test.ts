@@ -48,6 +48,7 @@ test('compact rendering: previews, details, rows and summary', async () => {
   assert.equal(duration(999), '');
   assert.equal(duration(125_000), '2m5s');
   assert.equal(row('$ echo   hi\nthere {1 line}', 'ok', false, 80), '◆ $ echo hi there {1 line}');
+  assert.equal(row('thinking', 'wait', false, 80), '◇ thinking');
   assert.equal(row('x'.repeat(50), 'error', false, 12), `✗ ${'x'.repeat(9)}…`);
   assert.match(
     row('edit a {+1/-2}', 'ok', true, 80),

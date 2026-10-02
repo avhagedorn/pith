@@ -4,6 +4,7 @@ import { row, type RowState } from './render.js';
 const FALLBACK_WIDTH = 100;
 const MAX_WIDTH = 110;
 const CTRL_C = 3;
+const BLINK_MS = 400;
 // Everything below space except tab and newline, plus DEL and the C1 range.
 const CONTROL_CHARACTERS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
 
@@ -39,6 +40,24 @@ export function createTerminal(clean: (text: string) => string, onInterrupt: () 
     else process.stdin.off('data', swallowKeys).pause();
   };
 
+  // A row that is still running blinks its mark until the next write replaces it.
+  // Every other write stops the animation first.
+  let animation: ReturnType<typeof setInterval> | undefined;
+  const stopAnimation = () => {
+    clearInterval(animation);
+    animation = undefined;
+  };
+  const animate = (text: string) => {
+    let lit = false;
+    const draw = () => {
+      lit = !lit;
+      process.stderr.write(wipe + row(clean(text), lit ? 'run' : 'wait', color, width()));
+    };
+    draw();
+    animation = setInterval(draw, BLINK_MS);
+    animation.unref();
+  };
+
   // However the process ends, the shell gets its cursor and key handling back.
   process.on('exit', () => {
     showCursor(true);
@@ -53,31 +72,38 @@ export function createTerminal(clean: (text: string) => string, onInterrupt: () 
     styled: color && Boolean(process.stdout.isTTY),
 
     status(text: string, dimmed = false) {
+      stopAnimation();
       const body = dimmed && color ? `${ansi.DIM}${clean(text)}${ansi.RESET}` : clean(text);
       process.stderr.write(`${wipe}${body}\n`);
     },
 
     // A transient row has no newline, so the next write overwrites it.
     row(text: string, state: RowState, placement: RowPlacement = 'keep') {
-      if (placement === 'transient' && !canRedraw) return;
+      stopAnimation();
+      if (placement === 'transient') {
+        if (canRedraw) animate(text);
+        return;
+      }
       const start = placement === 'replace-previous' ? `${wipe}${ansi.CURSOR_UP}${wipe}` : wipe;
-      const end = placement === 'transient' ? '' : '\n';
-      process.stderr.write(start + row(clean(text), state, color, width()) + end);
+      process.stderr.write(`${start}${row(clean(text), state, color, width())}\n`);
     },
 
     // Takes text that is already cleaned and styled.
     text(line: string) {
+      stopAnimation();
       process.stderr.write(wipe);
       process.stdout.write(`${line}\n`);
     },
 
     blankLine() {
+      stopAnimation();
       process.stderr.write('\n');
     },
 
     // While busy the cursor is hidden and typing is discarded, so a visible cursor always
     // means "your turn" and stray keys cannot corrupt redrawn rows or leak into the prompt.
     busy(on: boolean) {
+      if (!on) stopAnimation();
       showCursor(!on);
       muteKeys(on);
     },

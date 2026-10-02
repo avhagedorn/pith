@@ -45,9 +45,9 @@ test('consecutive successes of one tool share a row; a failure gets its own', ()
     result: { text: 'x\nexit 0', isError: false },
   });
   assert.deepEqual(shown, [
-    'transient run: read a {running}',
+    'transient run: read a',
     'keep ok: read a {2 lines}',
-    'transient run: read b {running}',
+    'transient run: read b',
     'replace-previous ok: 2× read b {2 lines}',
     'keep error: read c {exit 1}',
     'keep ok: $ ls {x}',
