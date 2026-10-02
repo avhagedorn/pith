@@ -11,7 +11,9 @@ One model, four tools, one loop. About 1,300 lines of TypeScript on top of [pi-a
 ◆ $ node test.mjs {exit 1}
 ◆ edit add.mjs {+1/-1}
 ◆ $ node test.mjs {PASS}
+
 add.mjs used a - b instead of a + b. Fixed, and the test passes.
+
 ── Read 2 files, edited 1 file, ran 2 commands, 1 failed · 5s · ~$0.0004 ──────
 ```
 
@@ -46,7 +48,7 @@ Without `--allow-local-tools` you only get `read`.
 
 Each tool call is one dim row with a diamond: grey while running, green when it works, red when it doesn't. Repeats of the same tool share a row. Edits show line counts instead of a diff.
 
-Model text prints a line at a time with light markdown styling. Each turn ends with a one-line summary.
+Model text prints a line at a time with light markdown styling. A blank line separates it from the tool rows above and from the one-line summary that ends each turn.
 
 The rest is your terminal. Scrollback, selection and search work as usual, because nothing redraws the screen. Typing during a run is ignored; Ctrl-C cancels it.
 
@@ -69,14 +71,15 @@ git clone https://github.com/avhagedorn/pith.git ~/dev/pith
 cd ~/dev/pith
 npm ci --ignore-scripts
 npm run build
+ln -s ~/dev/pith/pith ~/.local/bin/pith   # or any directory on your PATH
 ```
 
 Then, from the repository you want to work on:
 
 ```bash
-~/dev/pith/pith --allow-local-tools                          # interactive
-~/dev/pith/pith --allow-local-tools "fix the failing test"   # one task, then exit
-~/dev/pith/pith --check                                      # check setup; no request, no cost
+pith --allow-local-tools                          # interactive
+pith --allow-local-tools "fix the failing test"   # one task, then exit
+pith --check                                      # check setup; no request, no cost
 ```
 
 It needs an OpenRouter key: `OPENROUTER_API_KEY`, or the one [Pi](https://pi.dev) already saved in `~/.pi/agent/auth.json`. Pi's file is read, never written.
