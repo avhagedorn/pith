@@ -39,7 +39,7 @@ test('CLI help needs no config and warns that bash is unsandboxed', async () => 
   const { stdout, stderr } = await promisify(execFile)(process.execPath, [cli.pathname, '--help'], {
     env: { PATH: process.env.PATH },
   });
-  assert.match(stdout, /z-ai\/glm-5\.3-flash/);
+  assert.match(stdout, /config\.json/);
   assert.match(stdout, /NOT sandboxed/);
   assert.equal(stderr, '');
 });

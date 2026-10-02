@@ -13,7 +13,7 @@ import {
 } from './config.js';
 import { errorCode, errorText } from './errors.js';
 import { runTurn, type RunOutcome } from './loop.js';
-import { createModel, MODEL_ID, PROVIDER, REASONING } from './model.js';
+import { createModel, REASONING } from './model.js';
 import { openSessionLog } from './session.js';
 import { createTerminal, terminalText } from './terminal.js';
 import { createTools } from './tools/index.js';
@@ -39,8 +39,7 @@ Usage: pith [--cwd PATH] ["task"]
   --check     Check local model/config setup; no API request or billing
   --help      Show this help
 
-Model: ${PROVIDER} / ${MODEL_ID} (fixed; no model fallback)
-Keys: ~/.config/pith/config.json (openrouterApiKey, and optionally exaApiKey)
+Config: ~/.config/pith/config.json (openrouterApiKey, model, and optionally exaApiKey)
 Ctrl-C cancels a run, or quits at the prompt. Each launch is a new conversation.
 Logs: ~/.local/state/pith/sessions/ (private JSONL; no disk resume yet)
 
@@ -83,7 +82,7 @@ async function main() {
 
   const cwd = await realpath(values.cwd || process.cwd());
   if (!(await stat(cwd)).isDirectory()) throw new Error('Workspace must be a directory.');
-  const { openrouterApiKey, exaApiKey } = await loadConfig();
+  const { openrouterApiKey, model, exaApiKey } = await loadConfig();
   const secrets = [openrouterApiKey, exaApiKey];
   const tools = await createTools(cwd, exaApiKey);
   const toolNames = tools.definitions.map(tool => tool.name).join(', ');
@@ -93,8 +92,8 @@ async function main() {
   const term = createTerminal(text => terminalText(redact(text, secrets)), interrupt);
 
   if (values.check) {
-    createModel(openrouterApiKey, 'setup-check'); // throws if the pinned model is missing
-    term.status(`model: ${MODEL_ID}\nworkspace: ${cwd}\ntools: ${toolNames}`);
+    createModel(openrouterApiKey, model, 'setup-check'); // throws if the pinned model is missing
+    term.status(`model: ${model}\nworkspace: ${cwd}\ntools: ${toolNames}`);
     term.status(`search: Exa, ${exaApiKey ? 'with your key' : 'anonymous (rate limited)'}`);
     term.status(`config: ${CONFIG_PATH}`);
     term.status('local setup ready — no API request made; remote key validity not checked');
@@ -117,14 +116,14 @@ async function main() {
   const log = await openSessionLog(
     {
       cwd,
-      model: MODEL_ID,
+      model,
       reasoning: REASONING,
       systemPrompt,
       tools: tools.definitions,
     },
     secrets,
   );
-  const generate = createModel(openrouterApiKey, log.id);
+  const generate = createModel(openrouterApiKey, model, log.id);
   const transcript = createTranscript(term);
 
   // A fresh readline per question: none exists while the agent runs, so nothing echoes typing.

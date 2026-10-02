@@ -10,17 +10,29 @@ test('config must exist, be private and hold an OpenRouter key; the Exa key is o
   const path = join(await fixture(t), 'config.json');
   await assert.rejects(loadConfig(path), /No config/);
 
-  await writeFile(path, JSON.stringify({ openrouterApiKey: ' sk-or-x ', exaApiKey: '', other: 1 }));
+  await writeFile(
+    path,
+    JSON.stringify({ openrouterApiKey: ' sk-or-x ', model: 'a/b', exaApiKey: '', other: 1 }),
+  );
   await chmod(path, 0o644);
   await assert.rejects(loadConfig(path), /chmod 600/);
   await chmod(path, 0o600);
-  assert.deepEqual(await loadConfig(path), { openrouterApiKey: 'sk-or-x', exaApiKey: undefined });
+  assert.deepEqual(await loadConfig(path), {
+    openrouterApiKey: 'sk-or-x',
+    model: 'a/b',
+    exaApiKey: undefined,
+  });
 
-  await writeFile(path, JSON.stringify({ openrouterApiKey: 'sk-or-x', exaApiKey: 'exa-y' }));
+  await writeFile(
+    path,
+    JSON.stringify({ openrouterApiKey: 'sk-or-x', model: 'a/b', exaApiKey: 'exa-y' }),
+  );
   assert.equal((await loadConfig(path)).exaApiKey, 'exa-y');
 
   await writeFile(path, JSON.stringify({ exaApiKey: 'exa-y' }));
   await assert.rejects(loadConfig(path), /Add "openrouterApiKey"/);
+  await writeFile(path, JSON.stringify({ openrouterApiKey: 'sk-or-x' }));
+  await assert.rejects(loadConfig(path), /Add "model"/);
   await writeFile(path, '{ not json');
   await assert.rejects(loadConfig(path), /not valid JSON/);
 });

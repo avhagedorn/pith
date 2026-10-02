@@ -1,8 +1,7 @@
 import { createModels, type AssistantMessage, type Context } from '@earendil-works/pi-ai';
 import { openrouterProvider } from '@earendil-works/pi-ai/providers/openrouter';
 
-export const PROVIDER = 'openrouter';
-export const MODEL_ID = 'z-ai/glm-5.3-flash';
+const PROVIDER = 'openrouter';
 export const REASONING = 'low';
 export const MAX_OUTPUT_TOKENS = 8192;
 const REQUEST_TIMEOUT_MS = 120_000;
@@ -13,15 +12,13 @@ export type Generate = (
   onText: (text: string) => void,
 ) => Promise<AssistantMessage>;
 
-// One pinned model. No fallback list, no retries, no provider-side context rewriting.
-export function createModel(apiKey: string, sessionId: string): Generate {
+// One model, named in the config. No fallback, no retries, no provider-side context rewriting.
+export function createModel(apiKey: string, modelId: string, sessionId: string): Generate {
   const models = createModels();
   models.setProvider(openrouterProvider());
-  const model = models.getModel(PROVIDER, MODEL_ID);
+  const model = models.getModel(PROVIDER, modelId);
   if (!model) {
-    throw new Error(
-      `Pinned pi-ai catalog does not contain ${MODEL_ID}. No fallback model is configured.`,
-    );
+    throw new Error(`Unknown OpenRouter model "${modelId}". Check "model" in the config.`);
   }
 
   return async (context, signal, onText) => {

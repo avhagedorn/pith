@@ -10,6 +10,7 @@ const REDACTED = '[REDACTED]';
 
 export interface Config {
   openrouterApiKey: string;
+  model: string; // an OpenRouter model id
   exaApiKey?: string; // optional: lifts the rate limit on anonymous search
 }
 
@@ -34,9 +35,10 @@ export async function loadConfig(path = CONFIG_PATH): Promise<Config> {
     const value = file?.[name];
     return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   };
-  const openrouterApiKey = key('openrouterApiKey');
+  const [openrouterApiKey, model] = [key('openrouterApiKey'), key('model')];
   if (!openrouterApiKey) throw new Error(`Add "openrouterApiKey" to ${path}.`);
-  return { openrouterApiKey, exaApiKey: key('exaApiKey') };
+  if (!model) throw new Error(`Add "model" to ${path}.`);
+  return { openrouterApiKey, model, exaApiKey: key('exaApiKey') };
 }
 
 export const INSTRUCTIONS_FILE = 'AGENTS.md';
