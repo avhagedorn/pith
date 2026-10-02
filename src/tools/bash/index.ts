@@ -5,7 +5,7 @@ import { DEFAULT_TIMEOUT_S, MAX_TIMEOUT_S, runShell } from './shell.js';
 const MAX_COMMAND_LENGTH = 32_768;
 const DESCRIPTION =
   'Run a non-interactive bash command in the workspace. UNSANDBOXED. No background jobs. ' +
-  'stdout/stderr combined, capped at 32 KiB. ' +
+  'stdout/stderr combined; long output keeps its start and end. ' +
   `Default timeout ${DEFAULT_TIMEOUT_S}s; maximum ${MAX_TIMEOUT_S}s.`;
 
 export const bash = (root: string) =>

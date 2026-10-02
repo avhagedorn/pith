@@ -1,9 +1,13 @@
 import { spawn } from 'node:child_process';
 import { errorCode } from '../../errors.js';
-import { MAX_OUTPUT_BYTES, TRUNCATION_NOTICE, type ToolOutput } from '../shared.js';
+import { MAX_OUTPUT_BYTES, type ToolOutput } from '../shared.js';
 
 export const DEFAULT_TIMEOUT_S = 30;
 export const MAX_TIMEOUT_S = 120;
+// Head, tail and this reserve (for the gap marker and exit status) add up to the result cap.
+const RESERVED_BYTES = 1024;
+const HEAD_BYTES = 8 * 1024;
+const TAIL_BYTES = MAX_OUTPUT_BYTES - HEAD_BYTES - RESERVED_BYTES;
 const SHELL = '/bin/bash';
 // No profile or rc file: startup scripts would run with the user's full setup.
 const SHELL_FLAGS = ['--noprofile', '--norc', '-c'];
@@ -49,17 +53,33 @@ export async function runShell(
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
-    const chunks: Buffer[] = [];
-    let captured = 0;
-    let truncated = false;
+    // Long output keeps both ends: commands tend to put what matters last.
+    const head: Buffer[] = [];
+    const tail: Buffer[] = [];
+    let headBytes = 0;
+    let tailBytes = 0;
+    let totalBytes = 0;
     // Keeps reading past the cap: a full pipe would block the child forever.
     const capture = (chunk: Buffer) => {
-      const remaining = MAX_OUTPUT_BYTES - captured;
-      if (chunk.length > remaining) truncated = true;
-      if (remaining <= 0) return;
-      const part = chunk.subarray(0, remaining);
-      chunks.push(part);
-      captured += part.length;
+      totalBytes += chunk.length;
+      const headRoom = HEAD_BYTES - headBytes;
+      if (headRoom > 0) {
+        const part = chunk.subarray(0, headRoom);
+        head.push(part);
+        headBytes += part.length;
+        chunk = chunk.subarray(part.length);
+      }
+      if (!chunk.length) return;
+      tail.push(chunk);
+      tailBytes += chunk.length;
+      // Whole chunks are dropped from the front once the rest still fills the tail.
+      while (tailBytes - tail[0]!.length >= TAIL_BYTES) tailBytes -= tail.shift()!.length;
+    };
+    const capturedOutput = () => {
+      const end = Buffer.concat(tail).subarray(-TAIL_BYTES);
+      const omitted = totalBytes - headBytes - end.length;
+      const gap = omitted ? `\n[… ${omitted} bytes truncated …]\n` : '';
+      return `${Buffer.concat(head).toString('utf8')}${gap}${end.toString('utf8')}`;
     };
 
     const killGroup = () => {
@@ -100,10 +120,9 @@ export async function runShell(
     child.once('close', (code, exitSignal) => {
       cleanup();
       killGroup(); // Anything the command left in the background dies with it.
-      const output = Buffer.concat(chunks).toString('utf8');
       const status = stopReason ?? `exit ${code ?? exitSignal}`;
       resolve({
-        text: `${output}${truncated ? TRUNCATION_NOTICE : ''}\n${status}`,
+        text: `${capturedOutput()}\n${status}`,
         isError: Boolean(stopReason) || code !== 0,
       });
     });

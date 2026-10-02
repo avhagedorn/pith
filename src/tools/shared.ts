@@ -14,7 +14,7 @@ import { errorCode } from '../errors.js';
 
 export const MAX_OUTPUT_BYTES = 32 * 1024;
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
-export const TRUNCATION_NOTICE = '\n[output truncated at 32 KiB]';
+const TRUNCATION_NOTICE = '\n[output truncated at 32 KiB]';
 const MAX_PATH_LENGTH = 4096;
 const NEW_FILE_MODE = 0o600;
 const PERMISSION_BITS = 0o777;

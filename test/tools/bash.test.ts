@@ -25,9 +25,6 @@ test('shell captures exit status, caps both streams, and excludes credential env
   assert.match(result.text, /out/);
   assert.match(result.text, /err/);
   assert.match(result.text, /exit 7/);
-  const huge = await runShell('yes x | head -c 100000', root, signal());
-  assert.match(huge.text, /truncated/);
-  assert.ok(Buffer.byteLength(huge.text) < MAX_OUTPUT_BYTES + 150);
   const env = shellEnvironment({
     PATH: '/bin',
     HOME: root,
@@ -58,4 +55,17 @@ test('shell timeout/cancel stop the process group, including a delayed writer', 
   assert.match(cancelled.text, /Cancelled/);
   await new Promise(resolve => setTimeout(resolve, 450));
   assert.deepEqual(await readdir(root), []);
+});
+
+test('long output keeps its start and end, and still fits the result cap', async t => {
+  const root = await fixture(t);
+  const tools = await createTools(root);
+  const command = 'echo START; yes x | head -c 100000; echo; echo END; exit 3';
+  const result = await tools.execute(call('bash', { command }), signal());
+  assert.match(result.text, /^START\n/);
+  assert.match(result.text, /\n\[… \d+ bytes truncated …\]\n/);
+  assert.match(result.text, /\nEND\n\nexit 3$/);
+  assert.ok(Buffer.byteLength(result.text) <= MAX_OUTPUT_BYTES);
+  const short = await tools.execute(call('bash', { command: 'echo hi' }), signal());
+  assert.equal(short.text, 'hi\n\nexit 0');
 });
