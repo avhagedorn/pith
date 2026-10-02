@@ -22,6 +22,8 @@ export function createTranscript(term: Terminal) {
   let stats = newStats();
   let toolStartedAt = 0;
   let burst: Burst | undefined; // consecutive successes of one tool, sharing a row
+  let rowsAbove = false; // tool rows sit directly above, so text needs a blank line first
+  let shownAnything = false; // this turn has output, so the summary needs a blank line first
 
   // Blank lines are held back: dropped at either end of a response, collapsed in the middle.
   const say = (line: string) => {
@@ -30,6 +32,9 @@ export function createTranscript(term: Terminal) {
       return;
     }
     burst = undefined;
+    if (rowsAbove) term.status('');
+    rowsAbove = false;
+    shownAnything = true;
     term.text(`${gapOwed ? '\n' : ''}${style(term.clean(line))}`);
     said = true;
     gapOwed = false;
@@ -57,6 +62,7 @@ export function createTranscript(term: Terminal) {
       ? undefined
       : { name: call.name, count: (joined?.count ?? 0) + 1, ms: (joined?.ms ?? 0) + ms };
 
+    rowsAbove = shownAnything = true;
     const times = joined ? `${burst!.count}× ` : '';
     const info = detail(call, result, burst?.ms ?? ms);
     term.row(
@@ -70,6 +76,7 @@ export function createTranscript(term: Terminal) {
     begin() {
       stats = newStats();
       burst = undefined;
+      rowsAbove = shownAnything = false;
     },
 
     onProgress(notice: Notice) {
@@ -99,6 +106,7 @@ export function createTranscript(term: Terminal) {
 
     end(outcome: RunOutcome) {
       endText();
+      if (shownAnything) term.status('');
       if (outcome.reason !== 'complete') term.status(`[${outcome.reason}] ${outcome.detail}`);
       term.status(rule(summary(stats, Date.now() - stats.startedAt), term.width()), true);
     },

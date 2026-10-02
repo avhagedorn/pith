@@ -72,6 +72,7 @@ test('text prints a finished line at a time, trims blank ends and breaks a burst
   transcript.onProgress({ type: 'text', text: ' line\n\n' });
   transcript.onProgress({ type: 'tool-end', call: read('b'), result: ok });
   assert.deepEqual(shown.slice(1), [
+    'status: ', // one blank line between tool rows and the text after them
     'text: first line',
     'text: \nsecond line',
     'keep ok: read b {2 lines}',
@@ -89,8 +90,19 @@ test('the turn ends with leftover text, any stop reason and a summary rule', () 
   transcript.onProgress({ type: 'text', text: 'unfinished' });
   transcript.end({ reason: 'aborted', detail: 'Cancelled.' });
   assert.deepEqual(shown.slice(1), [
+    'status: ',
     'text: unfinished',
+    'status: ',
     'status: [aborted] Cancelled.',
     `status: ${'── Ran 1 command, 1 failed · ~$0.0004 '.padEnd(60, '─')}`,
   ]);
+});
+
+test('a turn with no output gets no blank line before the summary', () => {
+  const { term, shown } = fakeTerminal();
+  const transcript = createTranscript(term);
+  transcript.begin();
+  transcript.end({ reason: 'error', detail: 'No connection.' });
+  assert.equal(shown.length, 2);
+  assert.equal(shown[0], 'status: [error] No connection.');
 });
