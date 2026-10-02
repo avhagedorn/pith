@@ -38,8 +38,6 @@ A turn stops after **20 model requests** or **512 KiB** of context. Nothing is s
 
 File tools stay inside the workspace. Files are capped at **2 MiB** and tool results at **32 KiB**. Calls run one at a time.
 
-Without `--allow-local-tools` you only get `read`.
-
 ### The model
 
 [OpenRouter](https://openrouter.ai), `z-ai/glm-5.3-flash`, low reasoning. It's pinned: no fallback, no retries, no model switching. Costs shown are catalog estimates, not your bill.
@@ -56,7 +54,7 @@ Full tool output isn't shown. It goes to a private log in `~/.local/state/pith/s
 
 ## Is it safe?
 
-Not by itself. **`--allow-local-tools` runs shell commands with your permissions and no sandbox.**
+Not by itself. **The shell tool runs commands with your permissions and no sandbox, and it is always on.** There is no read-only mode.
 
 The path checks stop the file tools from wandering out of the workspace by accident. The shell isn't bound by them. It can read your home directory and reach the network. It doesn't inherit the API key, which limits exposure and isn't isolation.
 
@@ -77,9 +75,9 @@ ln -s ~/dev/pith/pith ~/.local/bin/pith   # or any directory on your PATH
 Then, from the repository you want to work on:
 
 ```bash
-pith --allow-local-tools                          # interactive
-pith --allow-local-tools "fix the failing test"   # one task, then exit
-pith --check                                      # check setup; no request, no cost
+pith                          # interactive
+pith "fix the failing test"   # one task, then exit
+pith --check                  # check setup; no request, no cost
 ```
 
 It needs an OpenRouter key: `OPENROUTER_API_KEY`, or the one [Pi](https://pi.dev) already saved in `~/.pi/agent/auth.json`. Pi's file is read, never written.

@@ -7,7 +7,7 @@ import { call, fixture, signal } from './helpers.js';
 
 test('edit makes one exact replacement and keeps the file mode', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   await writeFile(join(root, 'example.txt'), 'one\ntwo\nthree');
   await chmod(join(root, 'example.txt'), 0o640);
   const result = await tools.execute(
@@ -22,7 +22,7 @@ test('edit makes one exact replacement and keeps the file mode', async t => {
 
 test('ambiguous (including overlapping) or missing edits do not change files', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   await writeFile(join(root, 'a.txt'), 'aaa');
   for (const oldText of ['aa', 'missing']) {
     const result = await tools.execute(

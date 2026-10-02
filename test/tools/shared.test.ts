@@ -11,7 +11,7 @@ test('workspace paths reject traversal and symlinks to outside files/directories
   const outside = await fixture(t);
   await writeFile(join(outside, 'secret.txt'), 'not allowed');
   await symlink(outside, join(root, 'escape'));
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   for (const path of ['../secret.txt', join(outside, 'secret.txt'), 'escape/secret.txt']) {
     assert.equal((await tools.execute(call('read', { path }), signal())).isError, true);
   }

@@ -8,7 +8,7 @@ import { call, fixture, signal } from './helpers.js';
 
 test('bash runs in the workspace and reports the exit status', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   const ok = await tools.execute(call('bash', { command: 'echo hi > made.txt && ls' }), signal());
   assert.deepEqual(ok, { text: 'made.txt\n\nexit 0', isError: false });
   assert.deepEqual(await readdir(root), ['made.txt']);

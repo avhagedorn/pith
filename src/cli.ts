@@ -16,6 +16,7 @@ import { createTranscript } from './transcript.js';
 const MAX_PROMPT_BYTES = 64 * 1024;
 const PROMPT_TOO_LONG = 'Prompt exceeds 64 KiB.';
 const PROMPT_MARK = '❯ ';
+const UNSANDBOXED_NOTE = 'Execution mode: local tools enabled; bash is unsandboxed.';
 const BASE_PROMPT_FILE = new URL('../../prompt.md', import.meta.url);
 const EXIT_CODE: Record<RunOutcome['reason'], number> = {
   complete: 0,
@@ -25,20 +26,19 @@ const EXIT_CODE: Record<RunOutcome['reason'], number> = {
 };
 const HELP = `pith — a plain-terminal coding agent
 
-Usage: pith [--cwd PATH] [--allow-local-tools] ["task"]
+Usage: pith [--cwd PATH] ["task"]
        printf 'task' | pith --cwd PATH
 
-  --cwd PATH           Workspace (default: current directory)
-  --allow-local-tools  Enable write, edit and UNSANDBOXED bash (read is always available)
-  --check              Check local model/auth setup; no API request or billing
-  --help               Show this help
+  --cwd PATH  Workspace (default: current directory)
+  --check     Check local model/auth setup; no API request or billing
+  --help      Show this help
 
 Model: ${PROVIDER} / ${MODEL_ID} (fixed; no model fallback)
 Auth: OPENROUTER_API_KEY, then Pi's saved OpenRouter API-key credential (read-only)
 Interactive: /new clears context, /exit quits, Ctrl-C cancels a run.
 Logs: ~/.local/state/pith/sessions/ (private JSONL; no disk resume yet)
 
-Local tools have your OS permissions. cwd/path checks are NOT a shell sandbox.
+The tools (read, write, edit, bash) run with your OS permissions. bash is NOT sandboxed.
 Use a disposable checkout/container and review git diff. No plugins, TUI or discovery.
 `;
 
@@ -66,7 +66,6 @@ async function main() {
     allowPositionals: true,
     options: {
       cwd: { type: 'string' },
-      'allow-local-tools': { type: 'boolean', default: false },
       check: { type: 'boolean', default: false },
       help: { type: 'boolean', short: 'h', default: false },
     },
@@ -78,9 +77,8 @@ async function main() {
 
   const cwd = await realpath(values.cwd || process.cwd());
   if (!(await stat(cwd)).isDirectory()) throw new Error('Workspace must be a directory.');
-  const allowLocalTools = values['allow-local-tools'];
   const auth = await resolveKey();
-  const tools = await createTools(cwd, allowLocalTools);
+  const tools = await createTools(cwd);
   const toolNames = tools.definitions.map(tool => tool.name).join(', ');
 
   let activeTurn: AbortController | undefined;
@@ -100,10 +98,7 @@ async function main() {
   const task = positionals.join(' ').trim() || (interactive ? '' : await readPipedPrompt());
 
   const basePrompt = (await readFile(BASE_PROMPT_FILE, 'utf8')).trim();
-  const mode = allowLocalTools
-    ? 'local tools enabled; bash is unsandboxed'
-    : 'read-only; only read is enabled';
-  const systemPrompt = `${basePrompt}\n\nWorkspace: ${cwd}\nExecution mode: ${mode}.`;
+  const systemPrompt = `${basePrompt}\n\nWorkspace: ${cwd}\n${UNSANDBOXED_NOTE}`;
   const context: Context = { systemPrompt, tools: tools.definitions, messages: [] };
   const log = await SessionLog.create(
     {
@@ -112,7 +107,6 @@ async function main() {
       reasoning: REASONING,
       systemPrompt,
       tools: tools.definitions,
-      allowLocalTools,
     },
     auth.key,
   );
@@ -175,11 +169,7 @@ async function main() {
     term.status(
       `pith · ${MODEL_ID}\nworkspace: ${cwd}\nauth: ${auth.source}\nsession: ${log.path}`,
     );
-    term.status(
-      allowLocalTools
-        ? 'LOCAL TOOLS ENABLED — bash is unsandboxed. Review changes.'
-        : 'read-only — add --allow-local-tools to enable write/edit/bash.',
-    );
+    term.status('bash is unsandboxed. Review changes.');
 
     if (!interactive) {
       process.exitCode = EXIT_CODE[(await runPrompt(task)).reason];

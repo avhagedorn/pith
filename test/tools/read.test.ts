@@ -10,7 +10,7 @@ import { call, fixture, signal } from './helpers.js';
 
 test('read numbers lines, honours offset/limit and points at the next offset', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, false);
+  const tools = await createTools(root);
   await writeFile(join(root, 'example.txt'), 'one\ntwo\nthree');
   const window = await tools.execute(
     call('read', { path: 'example.txt', offset: 2, limit: 1 }),
@@ -23,7 +23,7 @@ test('read numbers lines, honours offset/limit and points at the next offset', a
 
 test('binary files, directories and large files are rejected; text output is bounded', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   await writeFile(join(root, 'binary'), Buffer.from([0, 255]));
   await writeFile(join(root, 'large'), 'a'.repeat(2 * 1024 * 1024 + 1));
   await writeFile(join(root, 'text'), 'x'.repeat(40_000));
@@ -37,7 +37,7 @@ test('binary files, directories and large files are rejected; text output is bou
 test('reading a FIFO fails promptly instead of blocking the agent', async t => {
   const root = await fixture(t);
   await promisify(execFile)('mkfifo', [join(root, 'pipe')]);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   const result = await tools.execute(call('read', { path: 'pipe' }), signal());
   assert.equal(result.isError, true);
   assert.match(result.text, /regular text file/);

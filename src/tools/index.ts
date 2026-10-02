@@ -8,10 +8,9 @@ import { write } from './write/index.js';
 
 export type { ToolOutput, ToolSet } from './shared.js';
 
-// read is always on. Anything that can change the machine needs --allow-local-tools.
-export async function createTools(cwd: string, allowLocalTools: boolean): Promise<ToolSet> {
+export async function createTools(cwd: string): Promise<ToolSet> {
   const root = await realpath(cwd);
-  const tools = [read(root), ...(allowLocalTools ? [write(root), edit(root), bash(root)] : [])];
+  const tools = [read(root), write(root), edit(root), bash(root)];
   const runners = new Map(tools.map(tool => [tool.definition.name, tool.run]));
 
   return {
@@ -21,7 +20,7 @@ export async function createTools(cwd: string, allowLocalTools: boolean): Promis
       try {
         signal.throwIfAborted();
         const run = runners.get(call.name);
-        if (!run) throw new Error(`Unknown or disabled tool: ${call.name}`);
+        if (!run) throw new Error(`Unknown tool: ${call.name}`);
         const result = await run(call, signal);
         return { ...result, text: bounded(result.text) };
       } catch (error) {

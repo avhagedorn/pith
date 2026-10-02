@@ -7,7 +7,7 @@ import { call, fixture, signal } from './helpers.js';
 
 test('write creates nested files privately and leaves no temporary file behind', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   const result = await tools.execute(
     call('write', { path: 'nested/example.txt', content: 'one\ntwo' }),
     signal(),
@@ -20,7 +20,7 @@ test('write creates nested files privately and leaves no temporary file behind',
 
 test('write replaces an existing file and keeps its mode', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   await writeFile(join(root, 'run.sh'), 'old');
   await chmod(join(root, 'run.sh'), 0o755);
   assert.equal(
@@ -33,7 +33,7 @@ test('write replaces an existing file and keeps its mode', async t => {
 
 test('already-cancelled operations do not write files', async t => {
   const root = await fixture(t);
-  const tools = await createTools(root, true);
+  const tools = await createTools(root);
   const controller = new AbortController();
   controller.abort();
   assert.equal(

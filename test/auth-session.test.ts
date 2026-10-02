@@ -72,12 +72,12 @@ test('JSONL audit records have private permissions, valid lines, and API key red
   assert.equal((await stat(dir)).mode & 0o777, 0o700);
 });
 
-test('CLI help needs no credentials and advertises the explicit local-tool flag', async () => {
+test('CLI help needs no credentials and warns that bash is unsandboxed', async () => {
   const cli = new URL('../src/cli.js', import.meta.url);
   const { stdout, stderr } = await promisify(execFile)(process.execPath, [cli.pathname, '--help'], {
     env: { PATH: process.env.PATH },
   });
   assert.match(stdout, /z-ai\/glm-5\.3-flash/);
-  assert.match(stdout, /--allow-local-tools/);
+  assert.match(stdout, /NOT sandboxed/);
   assert.equal(stderr, '');
 });
