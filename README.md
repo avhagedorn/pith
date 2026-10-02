@@ -36,7 +36,7 @@ A turn stops after **20 model requests** or **512 KiB** of context. Nothing is s
 | `edit` | One exact search and replace. Missing or ambiguous matches fail and change nothing. |
 | `bash` | `/bin/bash -c` in the workspace. 30 s timeout by default, 120 s at most. |
 
-File tools stay inside the workspace. Files are capped at **2 MiB** and tool results at **32 KiB**. Calls run one at a time.
+File tools stay inside the workspace. Files are capped at **2 MiB** and tool results at **32 KiB**. When a command prints more than that, the middle is dropped and both ends are kept, since the error is usually at the bottom. Calls run one at a time.
 
 ### The model
 
@@ -84,9 +84,11 @@ It needs an OpenRouter key: `OPENROUTER_API_KEY`, or the one [Pi](https://pi.dev
 
 `/new` clears the conversation. `/exit` quits.
 
+If the workspace has an `AGENTS.md` at its root, it's added to the system prompt. That's where "use pnpm" and "run tests with X" go.
+
 ## What it doesn't do
 
-Resume a session, compact context, sandbox anything, read images, run tools in parallel, switch models, load project instructions, or take plugins.
+Resume a session, compact context, sandbox anything, read images, run tools in parallel, switch models, or take plugins.
 
 Tables aren't aligned and checkboxes aren't rendered. Windows isn't supported.
 
@@ -106,6 +108,7 @@ src/
   model.ts        the pinned model
   auth.ts         finding the API key
   session.ts      the audit log
+  instructions.ts loading AGENTS.md
   transcript.ts   progress events → what you see
   terminal.ts     all terminal output
   render.ts       tool rows, summary and markdown styling

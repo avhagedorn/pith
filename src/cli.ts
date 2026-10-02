@@ -6,6 +6,7 @@ import type { Context } from '@earendil-works/pi-ai';
 import * as ansi from './ansi.js';
 import { redact, resolveKey } from './auth.js';
 import { errorCode, errorText } from './errors.js';
+import { INSTRUCTIONS_FILE, projectInstructions } from './instructions.js';
 import { runTurn, type RunOutcome } from './loop.js';
 import { createModel, MODEL_ID, PROVIDER, REASONING } from './model.js';
 import { SessionLog } from './session.js';
@@ -98,7 +99,13 @@ async function main() {
   const task = positionals.join(' ').trim() || (interactive ? '' : await readPipedPrompt());
 
   const basePrompt = (await readFile(BASE_PROMPT_FILE, 'utf8')).trim();
-  const systemPrompt = `${basePrompt}\n\nWorkspace: ${cwd}\n${UNSANDBOXED_NOTE}`;
+  const instructions = await projectInstructions(cwd);
+  const systemPrompt = [
+    `${basePrompt}\n\nWorkspace: ${cwd}\n${UNSANDBOXED_NOTE}`,
+    instructions && `Project instructions from ${INSTRUCTIONS_FILE}:\n\n${instructions}`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
   const context: Context = { systemPrompt, tools: tools.definitions, messages: [] };
   const log = await SessionLog.create(
     {
@@ -169,6 +176,7 @@ async function main() {
     term.status(
       `pith · ${MODEL_ID}\nworkspace: ${cwd}\nauth: ${auth.source}\nsession: ${log.path}`,
     );
+    if (instructions) term.status(`instructions: ${INSTRUCTIONS_FILE}`);
     term.status('bash is unsandboxed. Review changes.');
 
     if (!interactive) {
