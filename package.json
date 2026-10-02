@@ -10,9 +10,13 @@
   "bin": {
     "pith": "dist/src/cli.js"
   },
+  "files": [
+    "dist/src",
+    "prompt.md"
+  ],
   "scripts": {
-    "build": "rm -rf dist && tsc",
-    "start": "node dist/src/cli.js",
+    "build": "rm -rf dist && tsc && chmod +x dist/src/cli.js",
+    "prepare": "npm run build",
     "test": "npm run build && node --test 'dist/test/**/*.test.js'",
     "check": "tsc --noEmit",
     "format": "biome format --write",
