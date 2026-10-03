@@ -75,6 +75,7 @@ test('text prints a finished line at a time, trims blank ends and breaks a burst
     'status: ', // one blank line between tool rows and the text after them
     'text: first line',
     'text: \nsecond line',
+    'status: ', // and one between the text and the tool rows after it
     'keep ok: read b {2 lines}',
   ]);
 });

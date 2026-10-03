@@ -27,13 +27,14 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
   let contextTokens = 0; // as of the latest model response
   let burst: Burst | undefined; // consecutive successes of one tool, sharing a row
   let rowsAbove = false; // tool rows sit directly above, so text needs a blank line first
+  let textAbove = false; // text sits directly above, so rows need a blank line first
   let shownAnything = false; // this turn has output, so the summary needs a blank line first
 
   const print = (styledLine: string) => {
     burst = undefined;
     if (rowsAbove) term.status('');
     rowsAbove = false;
-    shownAnything = true;
+    textAbove = shownAnything = true;
     term.text(`${gapOwed ? '\n' : ''}${styledLine}`);
     said = true;
     gapOwed = false;
@@ -57,7 +58,13 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
     style = markdownStyler(term.styled, term.width); // an unclosed code fence must not leak onward
   };
 
+  const breakAfterText = () => {
+    if (textAbove) term.status('');
+    textAbove = false;
+  };
+
   const toolEnded = (call: ToolCall, result: ToolOutput) => {
+    breakAfterText();
     const ms = toolStartedAt ? Date.now() - toolStartedAt : 0;
     toolStartedAt = 0;
 
@@ -89,13 +96,14 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
     begin() {
       stats = newStats();
       burst = undefined;
-      rowsAbove = shownAnything = false;
+      rowsAbove = textAbove = shownAnything = false;
     },
 
     onProgress(notice: Notice) {
       switch (notice.type) {
         case 'request':
           endText();
+          breakAfterText();
           term.row('thinking', 'run', 'transient');
           break;
         case 'text': {
@@ -106,6 +114,7 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
         }
         case 'tool-start':
           endText();
+          breakAfterText();
           toolStartedAt = Date.now();
           term.row(preview(notice.call), 'run', 'transient');
           break;
@@ -126,6 +135,7 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
     end(outcome: RunOutcome, contextBytes = 0) {
       endText();
       if (shownAnything) term.status('');
+      textAbove = false;
       if (outcome.reason !== 'complete') term.status(`[${outcome.reason}] ${outcome.detail}`);
       const fill = Math.max(contextBytes / MAX_CONTEXT_BYTES, contextTokens / contextWindow);
       const context = contextTokens ? contextUse(contextTokens, fill) : '';
