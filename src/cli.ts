@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile, realpath, stat } from 'node:fs/promises';
+import { arch, platform, release, type } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import type { Context } from '@earendil-works/pi-ai';
@@ -23,6 +24,12 @@ const MAX_PROMPT_BYTES = 64 * 1024;
 const PROMPT_TOO_LONG = 'Prompt exceeds 64 KiB.';
 const PROMPT_MARK = '❯ ';
 const UNSANDBOXED_NOTE = 'Execution mode: local tools enabled; bash is unsandboxed.';
+// Commands work first time more often when the model knows which userland it is on.
+const MAC_NOTE =
+  ' macOS has BSD command-line tools, not GNU ones (no `timeout`, no `cat -A`,' +
+  ' `sed -i` needs an argument), and /bin/bash is version 3.2.';
+const PLATFORM_NOTE =
+  `Platform: ${type()} ${release()} (${arch()}).` + (platform() === 'darwin' ? MAC_NOTE : '');
 const BASE_PROMPT_FILE = new URL('../../prompt.md', import.meta.url);
 const EXIT_CODE: Record<RunOutcome['reason'], number> = {
   complete: 0,
@@ -108,7 +115,7 @@ async function main() {
   const basePrompt = (await readFile(BASE_PROMPT_FILE, 'utf8')).trim();
   const instructions = await projectInstructions(cwd);
   const systemPrompt = [
-    `${basePrompt}\n\nWorkspace: ${cwd}\n${UNSANDBOXED_NOTE}`,
+    `${basePrompt}\n\nWorkspace: ${cwd}\n${PLATFORM_NOTE}\n${UNSANDBOXED_NOTE}`,
     instructions && `Project instructions from ${INSTRUCTIONS_FILE}:\n\n${instructions}`,
   ]
     .filter(Boolean)

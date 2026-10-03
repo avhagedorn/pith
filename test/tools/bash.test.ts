@@ -13,7 +13,7 @@ test('bash runs in the workspace and reports the exit status', async t => {
   assert.deepEqual(ok, { text: 'made.txt\n\nexit 0', isError: false });
   assert.deepEqual(await readdir(root), ['made.txt']);
   assert.equal(
-    (await tools.execute(call('bash', { command: 'sleep 1', timeout: 121 }), signal())).isError,
+    (await tools.execute(call('bash', { command: 'sleep 1', timeout: 0 }), signal())).isError,
     true,
   );
 });

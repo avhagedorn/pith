@@ -3,7 +3,6 @@ import { errorCode } from '../../errors.js';
 import { MAX_OUTPUT_BYTES, type ToolOutput } from '../shared.js';
 
 export const DEFAULT_TIMEOUT_S = 30;
-export const MAX_TIMEOUT_S = 120;
 // Head, tail and this reserve (for the gap marker and exit status) add up to the result cap.
 const RESERVED_BYTES = 1024;
 const HEAD_BYTES = 8 * 1024;
