@@ -10,15 +10,13 @@ const REDACTED = '[REDACTED]';
 const COMMENT_LINES = /^\s*\/\/.*$/gm;
 
 const REASONING_LEVELS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-const DEFAULTS = { reasoning: 'low', maxOutputTokens: 8192, maxSteps: 20 } as const;
+const DEFAULT_REASONING = 'low';
 
 export interface Config {
   openrouterApiKey: string;
   model: string; // an OpenRouter model id
   exaApiKey?: string; // optional: lifts the rate limit on anonymous search
   reasoning: (typeof REASONING_LEVELS)[number];
-  maxOutputTokens: number; // per model response
-  maxSteps: number; // model requests allowed in one turn
 }
 
 export const redact = (text: string, secrets: (string | undefined)[]) =>
@@ -43,18 +41,11 @@ export async function loadConfig(path = CONFIG_PATH): Promise<Config> {
     const value = file?.[name];
     return typeof value === 'string' && value.trim() ? value.trim() : undefined;
   };
-  const count = (name: 'maxOutputTokens' | 'maxSteps') => {
-    const value = file?.[name] ?? DEFAULTS[name];
-    if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value;
-    throw new Error(`"${name}" in ${path} must be a positive whole number.`);
-  };
 
   const [openrouterApiKey, model] = [text('openrouterApiKey'), text('model')];
   if (!openrouterApiKey) throw new Error(`Add "openrouterApiKey" to ${path}.`);
   if (!model) throw new Error(`Add "model" to ${path}.`);
-  const reasoning = REASONING_LEVELS.find(
-    level => level === (file.reasoning ?? DEFAULTS.reasoning),
-  );
+  const reasoning = REASONING_LEVELS.find(level => level === (file.reasoning ?? DEFAULT_REASONING));
   if (!reasoning) {
     throw new Error(`"reasoning" in ${path} must be one of: ${REASONING_LEVELS.join(', ')}.`);
   }
@@ -63,8 +54,6 @@ export async function loadConfig(path = CONFIG_PATH): Promise<Config> {
     model,
     exaApiKey: text('exaApiKey'),
     reasoning,
-    maxOutputTokens: count('maxOutputTokens'),
-    maxSteps: count('maxSteps'),
   };
 }
 

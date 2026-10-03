@@ -49,7 +49,6 @@ function fixture(replies: AssistantMessage[]) {
   };
   const options = {
     prompt: 'do it',
-    maxSteps: 20,
     context,
     generate,
     signal: controller.signal,
@@ -143,10 +142,7 @@ test('cancellation during first tool settles every call ID without running remai
   assert.ok(results.every(m => m.isError));
 });
 
-test('step/input limits are visible stops, not success', async () => {
-  const f = fixture([response([tool()], 'toolUse')]);
-  assert.equal((await runTurn({ ...f.options, maxSteps: 1 })).reason, 'limit');
-  assert.equal(f.context.messages.at(-1)?.role, 'toolResult');
+test('a full context is a visible stop, not success', async () => {
   const g = fixture([final()]);
   assert.equal((await runTurn({ ...g.options, maxContextBytes: 1 })).reason, 'limit');
   assert.equal(g.seen.length, 0);

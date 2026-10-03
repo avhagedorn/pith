@@ -32,7 +32,6 @@ export interface TurnOptions {
   record: RecordEvent;
   onProgress: (notice: Notice) => void;
   signal: AbortSignal;
-  maxSteps: number;
   maxContextBytes?: number;
 }
 
@@ -44,7 +43,7 @@ export interface TurnOptions {
  * - Every tool call that enters the conversation gets a result, even when the turn is cancelled.
  */
 export async function runTurn(options: TurnOptions): Promise<RunOutcome> {
-  const { prompt, context, generate, tools, record, onProgress, signal, maxSteps } = options;
+  const { prompt, context, generate, tools, record, onProgress, signal } = options;
   const maxContextBytes = options.maxContextBytes ?? MAX_CONTEXT_BYTES;
 
   // Logged first, so the log never trails the conversation.
@@ -74,7 +73,8 @@ export async function runTurn(options: TurnOptions): Promise<RunOutcome> {
   if (signal.aborted) return finish('aborted', 'Cancelled before starting.');
   await append({ role: 'user', content: prompt, timestamp: Date.now() });
 
-  for (let step = 1; step <= maxSteps; step++) {
+  // No step limit: a turn ends when the model answers in text, is cancelled, or fills the context.
+  for (let step = 1; ; step++) {
     if (signal.aborted) return finish('aborted', 'Cancelled.');
     if (Buffer.byteLength(JSON.stringify(context)) > maxContextBytes) {
       return finish(
@@ -132,6 +132,4 @@ export async function runTurn(options: TurnOptions): Promise<RunOutcome> {
     if (signal.aborted)
       return finish('aborted', 'Cancelled. Inspect file changes before continuing.');
   }
-
-  return finish('limit', 'Model-request limit reached. Ask to continue, or start a new session.');
 }

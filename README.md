@@ -28,9 +28,7 @@ Then create `~/.config/pith/config.json`:
 
   // everything below this line is optional
   "exaApiKey": "...",
-  "reasoning": "low",
-  "maxOutputTokens": 8192,
-  "maxSteps": 20
+  "reasoning": "low"
 }
 ```
 
@@ -38,7 +36,7 @@ Then create `~/.config/pith/config.json`:
 chmod 600 ~/.config/pith/config.json
 ```
 
-The model can be anything on [OpenRouter](https://openrouter.ai) that supports tool calls. An [Exa](https://exa.ai) key lifts the rate limit on web search. The other three show their defaults.
+The model can be anything on [OpenRouter](https://openrouter.ai) that supports tool calls. An [Exa](https://exa.ai) key lifts the rate limit on web search. `reasoning` is shown at its default.
 
 Now go to a repo and run it:
 
@@ -84,7 +82,7 @@ pith
 
 Ask the model. Run the tools it asks for. Repeat until it answers in text. That's most of [`loop.ts`](src/loop.ts).
 
-A turn stops after **20 model requests** or **512 KiB** of context.
+A turn has no step limit. It ends when the model answers, when you cancel, or at **512 KiB** of context.
 
 ### Six tools
 

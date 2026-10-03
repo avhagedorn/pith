@@ -83,7 +83,7 @@ async function main() {
   const cwd = await realpath(values.cwd || process.cwd());
   if (!(await stat(cwd)).isDirectory()) throw new Error('Workspace must be a directory.');
   const config = await loadConfig();
-  const { openrouterApiKey, model, exaApiKey, reasoning, maxSteps } = config;
+  const { openrouterApiKey, model, exaApiKey, reasoning } = config;
   const secrets = [openrouterApiKey, exaApiKey];
   const tools = await createTools(cwd, exaApiKey);
   const toolNames = tools.definitions.map(tool => tool.name).join(', ');
@@ -169,7 +169,6 @@ async function main() {
       generate,
       tools,
       record: log.record,
-      maxSteps,
       onProgress: transcript.onProgress,
       signal: AbortSignal.any([activeTurn.signal, outputClosed.signal]),
     });

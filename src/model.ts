@@ -25,7 +25,6 @@ export function createModel(config: Config, sessionId: string): Generate {
       apiKey: config.openrouterApiKey,
       sessionId,
       signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
-      maxTokens: config.maxOutputTokens,
       reasoning: config.reasoning,
       maxRetries: 0,
       // Empty transforms turns off OpenRouter's context compression.
