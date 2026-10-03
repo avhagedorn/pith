@@ -88,13 +88,13 @@ test('the turn ends with leftover text, any stop reason and a summary rule', () 
   transcript.onProgress({ type: 'usage', usage });
   transcript.onProgress({ type: 'tool-end', call: bash, result: failed });
   transcript.onProgress({ type: 'text', text: 'unfinished' });
-  transcript.end({ reason: 'aborted', detail: 'Cancelled.' });
+  transcript.end({ reason: 'aborted', detail: 'Cancelled.' }, 128 * 1024);
   assert.deepEqual(shown.slice(1), [
     'status: ',
     'text: unfinished',
     'status: ',
     'status: [aborted] Cancelled.',
-    `status: ${'── Ran 1 command, 1 failed · ~$0.0004 '.padEnd(60, '─')}`,
+    `status: ${'── Ran 1 command, 1 failed · ~$0.0004 · context 25% (2 tokens) '.padEnd(60, '─')}`,
   ]);
 });
 

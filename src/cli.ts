@@ -125,7 +125,7 @@ async function main() {
     secrets,
   );
   const generate = createModel(config, log.id);
-  const transcript = createTranscript(term);
+  const transcript = createTranscript(term, generate.contextWindow);
 
   // A fresh readline per question: none exists while the agent runs, so nothing echoes typing.
   const history: string[] = [];
@@ -173,7 +173,7 @@ async function main() {
       signal: AbortSignal.any([activeTurn.signal, outputClosed.signal]),
     });
     activeTurn = undefined;
-    transcript.end(outcome);
+    transcript.end(outcome, Buffer.byteLength(JSON.stringify(context)));
     term.busy(false);
     return outcome;
   }

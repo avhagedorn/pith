@@ -96,7 +96,14 @@ export const newStats = (): TurnStats => ({
 });
 
 // "Read 2 files, edited 1 file, ran 3 commands, 1 failed · 42s · ~$0.0009"
-export function summary(stats: TurnStats, ms: number): string {
+// "context 9% (12k tokens)": how full the conversation is, against whichever limit comes first.
+export function contextUse(tokens: number, fill: number): string {
+  const count =
+    tokens < 1000 ? `${tokens}` : `${(tokens / 1000).toFixed(tokens < 10_000 ? 1 : 0)}k`;
+  return `context ${Math.round(fill * 100)}% (${count} tokens)`;
+}
+
+export function summary(stats: TurnStats, ms: number, context = ''): string {
   const activity = [
     stats.reads.size && `read ${plural(stats.reads.size, 'file')}`,
     stats.edits.size && `edited ${plural(stats.edits.size, 'file')}`,
@@ -107,5 +114,7 @@ export function summary(stats: TurnStats, ms: number): string {
     .filter(Boolean)
     .join(', ');
   const capitalized = activity && activity[0]!.toUpperCase() + activity.slice(1);
-  return [capitalized, duration(ms), `~$${stats.cost.toFixed(4)}`].filter(Boolean).join(' · ');
+  return [capitalized, duration(ms), `~$${stats.cost.toFixed(4)}`, context]
+    .filter(Boolean)
+    .join(' · ');
 }

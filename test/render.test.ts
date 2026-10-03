@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { detail, duration, newStats, preview, row, summary } from '../src/render.js';
+import { contextUse, detail, duration, newStats, preview, row, summary } from '../src/render.js';
 
 test('compact rendering: previews, details, rows and summary', async () => {
   const call = (name: string, args: Record<string, string | number>) => ({
@@ -57,4 +57,10 @@ test('compact rendering: previews, details, rows and summary', async () => {
     'Read 2 files, edited 1 file, ran 3 commands, 1 failed · 42s · ~$0.0009',
   );
   assert.equal(summary(newStats(), 10), '~$0.0000');
+  assert.equal(contextUse(12_345, 0.094), 'context 9% (12k tokens)');
+  assert.equal(contextUse(2_500, 0.5), 'context 50% (2.5k tokens)');
+  assert.equal(
+    summary(newStats(), 10, 'context 1% (900 tokens)'),
+    '~$0.0000 · context 1% (900 tokens)',
+  );
 });

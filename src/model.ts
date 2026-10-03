@@ -11,8 +11,10 @@ export type Generate = (
   onText: (text: string) => void,
 ) => Promise<AssistantMessage>;
 
+export type Model = Generate & { contextWindow: number };
+
 // One model, set in the config. No fallback, no retries, no provider-side context rewriting.
-export function createModel(config: Config, sessionId: string): Generate {
+export function createModel(config: Config, sessionId: string): Model {
   const models = createModels();
   models.setProvider(openrouterProvider());
   const model = models.getModel(PROVIDER, config.model);
@@ -20,7 +22,7 @@ export function createModel(config: Config, sessionId: string): Generate {
     throw new Error(`Unknown OpenRouter model "${config.model}". Check "model" in the config.`);
   }
 
-  return async (context, signal, onText) => {
+  const generate: Generate = async (context, signal, onText) => {
     const stream = models.streamSimple(model, context, {
       apiKey: config.openrouterApiKey,
       sessionId,
@@ -35,4 +37,5 @@ export function createModel(config: Config, sessionId: string): Generate {
     }
     return stream.result();
   };
+  return Object.assign(generate, { contextWindow: model.contextWindow });
 }

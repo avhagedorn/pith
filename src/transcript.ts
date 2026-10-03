@@ -1,7 +1,7 @@
 import type { ToolCall } from '@earendil-works/pi-ai';
-import type { Notice, RunOutcome } from './loop.js';
+import { MAX_CONTEXT_BYTES, type Notice, type RunOutcome } from './loop.js';
 import { markdownStyler } from './markdown.js';
-import { detail, newStats, preview, rule, summary } from './render.js';
+import { contextUse, detail, newStats, preview, rule, summary } from './render.js';
 import type { Terminal } from './terminal.js';
 import type { ToolOutput } from './tools/index.js';
 
@@ -17,13 +17,14 @@ interface Burst {
  * Turns the loop's progress notices into what the user sees: one row per tool call, model text
  * a finished line at a time, and a summary rule when the turn ends.
  */
-export function createTranscript(term: Terminal) {
+export function createTranscript(term: Terminal, contextWindow = Infinity) {
   let style = markdownStyler(term.styled, term.width);
   let pending = ''; // text received since the last newline
   let said = false; // this response has printed text
   let gapOwed = false; // a blank line is due before the next text
   let stats = newStats();
   let toolStartedAt = 0;
+  let contextTokens = 0; // as of the latest model response
   let burst: Burst | undefined; // consecutive successes of one tool, sharing a row
   let rowsAbove = false; // tool rows sit directly above, so text needs a blank line first
   let shownAnything = false; // this turn has output, so the summary needs a blank line first
@@ -113,14 +114,22 @@ export function createTranscript(term: Terminal) {
           break;
         case 'usage':
           stats.cost += notice.usage.cost.total;
+          contextTokens =
+            notice.usage.input +
+            notice.usage.cacheRead +
+            notice.usage.cacheWrite +
+            notice.usage.output;
       }
     },
 
-    end(outcome: RunOutcome) {
+    // `contextBytes` is the conversation's size now; pith stops at MAX_CONTEXT_BYTES.
+    end(outcome: RunOutcome, contextBytes = 0) {
       endText();
       if (shownAnything) term.status('');
       if (outcome.reason !== 'complete') term.status(`[${outcome.reason}] ${outcome.detail}`);
-      term.status(rule(summary(stats, Date.now() - stats.startedAt), term.width()), true);
+      const fill = Math.max(contextBytes / MAX_CONTEXT_BYTES, contextTokens / contextWindow);
+      const context = contextTokens ? contextUse(contextTokens, fill) : '';
+      term.status(rule(summary(stats, Date.now() - stats.startedAt, context), term.width()), true);
     },
   };
 }
