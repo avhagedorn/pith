@@ -30,3 +30,9 @@ export const SHOW_CURSOR = '\x1b[?25h';
 
 const CODES = /\x1b\[[0-9;]*m/g;
 export const visibleLength = (text: string) => [...text.replace(CODES, '')].length;
+
+// With bracketed paste on, the terminal wraps every paste in these markers.
+export const BRACKETED_PASTE_ON = '\x1b[?2004h';
+export const BRACKETED_PASTE_OFF = '\x1b[?2004l';
+export const PASTE_START = '\x1b[200~';
+export const PASTE_END = '\x1b[201~';

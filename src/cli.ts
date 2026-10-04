@@ -15,6 +15,7 @@ import {
 import { errorCode, errorText } from './errors.js';
 import { runTurn, type RunOutcome } from './loop.js';
 import { createModel } from './model.js';
+import { pasteCollapser } from './paste.js';
 import { openSessionLog } from './session.js';
 import { createTerminal, terminalText } from './terminal.js';
 import { createTools } from './tools/index.js';
@@ -137,9 +138,11 @@ async function main() {
   // A fresh readline per question: none exists while the agent runs, so nothing echoes typing.
   const history: string[] = [];
   async function ask(): Promise<string | undefined> {
+    const paste = pasteCollapser(process.stdin, process.stdout);
     const readline = createInterface({
-      input: process.stdin,
+      input: paste.input,
       output: process.stdout,
+      terminal: true,
       history,
       removeHistoryDuplicates: true,
     });
@@ -154,12 +157,13 @@ async function main() {
     // The color is left open so typed text shares it, and closed once the line is in.
     const tint = term.styled ? ansi.BOLD_CYAN : '';
     try {
-      return await readline.question(`\n${tint}${PROMPT_MARK}`, { signal });
+      return paste.expand(await readline.question(`\n${tint}${PROMPT_MARK}`, { signal }));
     } catch (error) {
       if (signal.aborted) return undefined;
       throw error;
     } finally {
       readline.close();
+      paste.close();
       if (tint) process.stdout.write(ansi.RESET);
     }
   }
