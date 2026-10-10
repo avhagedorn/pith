@@ -4,6 +4,9 @@ import type { Config } from './config.js';
 
 const PROVIDER = 'openrouter';
 const REQUEST_TIMEOUT_MS = 120_000;
+// OpenRouter refuses a request unless your credit could cover the most it might produce,
+// so asking for the model's full maximum (~1M tokens) fails on a modest balance.
+const MAX_OUTPUT_TOKENS = 32_768;
 
 export type Generate = (
   context: Context,
@@ -28,6 +31,7 @@ export function createModel(config: Config, sessionId: string): Model {
       sessionId,
       signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
       reasoning: config.reasoning,
+      maxTokens: MAX_OUTPUT_TOKENS,
       maxRetries: 0,
       // Empty transforms turns off OpenRouter's context compression.
       onPayload: payload => ({ ...(payload as Record<string, unknown>), transforms: [] }),
