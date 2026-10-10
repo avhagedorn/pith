@@ -1,4 +1,4 @@
-import type { ToolCall } from '@earendil-works/pi-ai';
+import type { Message, ToolCall } from '@earendil-works/pi-ai';
 import { MAX_CONTEXT_BYTES, type Notice, type RunOutcome } from './loop.js';
 import { markdownStyler } from './markdown.js';
 import { contextUse, detail, newStats, preview, rule, summary } from './render.js';
@@ -93,6 +93,39 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
   };
 
   return {
+    // Prints an earlier conversation roughly as it looked live: prompts, tool rows and answers.
+    replay(messages: Message[]) {
+      const calls = new Map<string, ToolCall>();
+      for (const message of messages) {
+        if (message.role === 'user') {
+          endText();
+          const blocks = typeof message.content === 'string' ? [message.content] : message.content;
+          term.pastPrompt(
+            blocks
+              .map(block =>
+                typeof block === 'string' ? block : block.type === 'text' ? block.text : '',
+              )
+              .join(''),
+          );
+          burst = undefined;
+          rowsAbove = textAbove = false;
+        } else if (message.role === 'assistant') {
+          for (const block of message.content) {
+            if (block.type === 'text') block.text.split('\n').forEach(say);
+            if (block.type === 'toolCall') calls.set(block.id, block);
+          }
+          endText();
+        } else if (message.role === 'toolResult') {
+          const call = calls.get(message.toolCallId);
+          const text = message.content
+            .map(part => (part.type === 'text' ? part.text : ''))
+            .join('');
+          if (call) toolEnded(call, { text, isError: message.isError });
+        }
+      }
+      endText();
+    },
+
     begin() {
       stats = newStats();
       burst = undefined;

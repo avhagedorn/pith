@@ -16,6 +16,7 @@ function fakeTerminal(canRedraw = true) {
     row: (text, state, placement = 'keep') => shown.push(`${placement} ${state}: ${text}`),
     text: line => shown.push(`text: ${line}`),
     blankLine: () => shown.push(''),
+    pastPrompt: text => shown.push(`prompt: ${text}`),
     busy: () => {},
   };
   return { term, shown };
@@ -106,4 +107,33 @@ test('a turn with no output gets no blank line before the summary', () => {
   transcript.end({ reason: 'error', detail: 'No connection.' });
   assert.equal(shown.length, 2);
   assert.equal(shown[0], 'status: [error] No connection.');
+});
+
+test('a resumed conversation is replayed as prompts, tool rows and answers', () => {
+  const { term, shown } = fakeTerminal();
+  const transcript = createTranscript(term);
+  const call = read('a');
+  transcript.replay([
+    { role: 'user', content: 'look at a', timestamp: 1 },
+    { role: 'assistant', content: [call], timestamp: 1 } as never,
+    {
+      role: 'toolResult',
+      toolCallId: 'a',
+      toolName: 'read',
+      content: [{ type: 'text', text: 'x\ny' }],
+      isError: false,
+      timestamp: 1,
+    },
+    {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'it has two lines' }],
+      timestamp: 1,
+    } as never,
+  ]);
+  assert.deepEqual(shown, [
+    'prompt: look at a',
+    'keep ok: read a {2 lines}',
+    'status: ',
+    'text: it has two lines',
+  ]);
 });

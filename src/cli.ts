@@ -16,14 +16,18 @@ import { errorCode, errorText } from './errors.js';
 import { runTurn, type RunOutcome } from './loop.js';
 import { createModel } from './model.js';
 import { pasteCollapser } from './paste.js';
-import { openSessionLog } from './session.js';
+import { listSessions, openSessionLog, readConversation } from './session.js';
 import { createTerminal, terminalText } from './terminal.js';
 import { createTools } from './tools/index.js';
 import { createTranscript } from './transcript.js';
+import { ago } from './render.js';
 
 const MAX_PROMPT_BYTES = 64 * 1024;
 const PROMPT_TOO_LONG = 'Prompt exceeds 64 KiB.';
 const PROMPT_MARK = '❯ ';
+const RESUME_LABEL_LENGTH = 60;
+const RESUME_CHOICES = 9;
+const REPLAYED_PROMPTS = 2;
 const UNSANDBOXED_NOTE = 'Execution mode: local tools enabled; bash is unsandboxed.';
 // Commands work first time more often when the model knows which userland it is on.
 const MAC_NOTE =
@@ -137,27 +141,30 @@ async function main() {
 
   // A fresh readline per question: none exists while the agent runs, so nothing echoes typing.
   const history: string[] = [];
-  async function ask(): Promise<string | undefined> {
+  // `mark` replaces ❯ for one-off questions, which also stay out of the up-arrow history.
+  async function ask(mark = PROMPT_MARK): Promise<string | undefined> {
     const paste = pasteCollapser(process.stdin, process.stdout);
     const readline = createInterface({
       input: paste.input,
       output: process.stdout,
       terminal: true,
-      history,
+      history: mark === PROMPT_MARK ? history : [],
       removeHistoryDuplicates: true,
     });
     const closed = new AbortController();
     readline.once('SIGINT', () => closed.abort());
     readline.once('close', () => closed.abort());
-    readline.on('history', entries => {
-      history.splice(0, history.length, ...entries);
-    });
+    if (mark === PROMPT_MARK) {
+      readline.on('history', entries => {
+        history.splice(0, history.length, ...entries);
+      });
+    }
     const signal = AbortSignal.any([closed.signal, outputClosed.signal]);
 
     // The color is left open so typed text shares it, and closed once the line is in.
     const tint = term.styled ? ansi.BOLD_CYAN : '';
     try {
-      return paste.expand(await readline.question(`\n${tint}${PROMPT_MARK}`, { signal }));
+      return paste.expand(await readline.question(`\n${tint}${mark}`, { signal }));
     } catch (error) {
       if (signal.aborted) return undefined;
       throw error;
@@ -189,6 +196,40 @@ async function main() {
     return outcome;
   }
 
+  // Lists this workspace's earlier sessions, narrowed to ones whose prompts contain every word
+  // in `filter`, and swaps the conversation for the one picked. Only the last prompts replay.
+  async function resume(filter: string) {
+    const words = filter.toLowerCase().split(/\s+/).filter(Boolean);
+    const sessions = (await listSessions(cwd))
+      .filter(session => session.path !== log.path)
+      .filter(session => words.every(word => session.text.toLowerCase().includes(word)))
+      .slice(0, RESUME_CHOICES);
+    if (!sessions.length) {
+      return term.status(
+        filter ? `No earlier sessions mention "${filter}".` : 'No earlier sessions here.',
+      );
+    }
+    term.blankLine();
+    sessions.forEach((session, i) => {
+      const when = ago(Date.now() - session.updatedAt).padEnd(12);
+      const count = `${session.prompts} prompt${session.prompts === 1 ? '' : 's'}`;
+      term.status(`  ${i + 1}  ${when} ${session.label.slice(0, RESUME_LABEL_LENGTH)}  (${count})`);
+    });
+    const range = sessions.length === 1 ? '1' : `1-${sessions.length}`;
+    const choice = sessions[Number(await ask(`resume which? (${range}, Enter to cancel) `)) - 1];
+    if (!choice) return term.status('Not resumed.', true);
+
+    context.messages = await readConversation(choice.path, cwd);
+    const prompts = context.messages.flatMap((message, i) => (message.role === 'user' ? [i] : []));
+    const from = prompts.at(-REPLAYED_PROMPTS) ?? 0;
+    const hidden = prompts.length - REPLAYED_PROMPTS;
+    if (from) term.status(`… ${hidden} earlier prompts not shown`, true);
+    transcript.replay(context.messages.slice(from));
+    await log.record({ type: 'resumed', from: choice.path });
+    for (const message of context.messages) await log.record({ type: 'message', message });
+    term.status(`Resumed "${choice.label.slice(0, RESUME_LABEL_LENGTH)}".`, true);
+  }
+
   process.on('SIGINT', interrupt);
   try {
     if (!interactive) {
@@ -200,7 +241,9 @@ async function main() {
     while (!outputClosed.signal.aborted) {
       const prompt = (await ask())?.trim();
       if (prompt === undefined) break;
-      if (prompt) await runPrompt(prompt);
+      if (prompt === '/resume' || prompt.startsWith('/resume '))
+        await resume(prompt.slice(7).trim());
+      else if (prompt) await runPrompt(prompt);
     }
   } finally {
     process.removeListener('SIGINT', interrupt);

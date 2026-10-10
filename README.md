@@ -44,6 +44,8 @@ Now go to a repo and run it:
 pith
 ```
 
+To pick up an earlier conversation in that repo, type `/resume` at the prompt, or `/resume <words>` to list only the sessions that mention them.
+
 ## What it does
 
 - Reads, writes and edits files in the repo you run it in.
@@ -55,7 +57,7 @@ pith
 
 ## What it doesn't do
 
-- Resume a session or compact a long one.
+- Compact a long session.
 - Sandbox anything.
 - Run tools in parallel.
 - Read images.

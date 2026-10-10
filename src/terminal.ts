@@ -64,12 +64,14 @@ export function createTerminal(clean: (text: string) => string, onInterrupt: () 
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
   });
 
+  const styled = color && Boolean(process.stdout.isTTY);
+
   return {
     canRedraw,
     width,
     clean,
     // Whether model text may be styled. Piped stdout gets the raw markdown.
-    styled: color && Boolean(process.stdout.isTTY),
+    styled,
 
     status(text: string, dimmed = false) {
       stopAnimation();
@@ -93,6 +95,14 @@ export function createTerminal(clean: (text: string) => string, onInterrupt: () 
       stopAnimation();
       process.stderr.write(wipe);
       process.stdout.write(`${line}\n`);
+    },
+
+    // An earlier prompt, drawn like the live one. A long one shows its first line only.
+    pastPrompt(text: string) {
+      const [first = '', ...more] = clean(text).split('\n');
+      const extra = more.length ? ` [+${more.length} lines]` : '';
+      const [on, off] = styled ? [ansi.BOLD_CYAN, ansi.RESET] : ['', ''];
+      process.stdout.write(`\n${on}❯ ${first}${extra}${off}\n\n`);
     },
 
     blankLine() {

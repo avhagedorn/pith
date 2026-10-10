@@ -23,6 +23,14 @@ export function duration(ms: number): string {
   return `${Math.floor(seconds / 60)}m${rest ? `${rest}s` : ''}`;
 }
 
+// "12 min ago", "3 h ago", "2 days ago".
+export function ago(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 48 * 60) return `${Math.round(minutes / 60)} h ago`;
+  return `${Math.round(minutes / 1440)} days ago`;
+}
+
 // What the call is, in one line: "$ npm test", "read src/a.ts:10-29".
 export function preview(call: ToolCall): string {
   const args = call.arguments ?? {};
