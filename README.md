@@ -72,7 +72,7 @@ To pick up an earlier conversation in that repo, type `/resume` at the prompt, o
 
 **Tool output is hidden.** You see one line per call, so the screen stays readable. The full output is in the log.
 
-**One model, no retries.** What you configure is what runs. If a request fails, it fails.
+**One model, no fallback.** What you configure is what runs. A request that fails before the answer starts is retried twice; one that fails partway is not, so nothing is repeated.
 
 **Nothing is summarised.** The model always sees the real conversation. A long session eventually hits the cap, and then you start a new one.
 
