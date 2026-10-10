@@ -2,7 +2,7 @@
 
 A small coding agent for your terminal.
 
-It asks a model what to do, runs the tools the model asks for, and keeps going until it has an answer. That's the whole thing: about **1,600 lines** of TypeScript, six tools, no TUI, no context bloat.
+It asks a model what to do, runs the tools the model asks for, and keeps going until it has an answer. That's the whole thing: under **2,000 lines** of TypeScript, six tools, no TUI, no context bloat.
 
 ![pith finding and fixing a failing test, then searching the web](docs/demo.gif)
 
