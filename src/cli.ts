@@ -216,7 +216,7 @@ async function main() {
       term.status(`  ${i + 1}  ${when} ${session.label.slice(0, RESUME_LABEL_LENGTH)}  (${count})`);
     });
     const range = sessions.length === 1 ? '1' : `1-${sessions.length}`;
-    const choice = sessions[Number(await ask(`resume which? (${range}, Enter to cancel) `)) - 1];
+    const choice = sessions[Number(await ask(`Resume which? [${range}]: `)) - 1];
     if (!choice) return term.status('Not resumed.', true);
 
     context.messages = await readConversation(choice.path, cwd);
