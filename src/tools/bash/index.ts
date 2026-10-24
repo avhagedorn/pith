@@ -4,7 +4,8 @@ import { DEFAULT_TIMEOUT_S, runShell } from './shell.js';
 
 const MAX_COMMAND_LENGTH = 32_768;
 const DESCRIPTION =
-  'Run a non-interactive bash command in the workspace. UNSANDBOXED. No background jobs. ' +
+  'Run a non-interactive bash command in the workspace. UNSANDBOXED. Foreground only: ' +
+  'for work that should not block the turn, use the background tool instead. ' +
   'stdout/stderr combined; long output keeps its start and end. ' +
   `Default timeout ${DEFAULT_TIMEOUT_S}s. ` +
   'Pass a larger timeout for long jobs like builds or training.';

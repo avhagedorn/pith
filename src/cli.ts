@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, realpath, stat } from 'node:fs/promises';
-import { arch, platform, release, type } from 'node:os';
+import { arch, constants, platform, release, type } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import type { Context } from '@earendil-works/pi-ai';
@@ -15,6 +15,7 @@ import {
 import { errorCode, errorText } from './errors.js';
 import { runTurn, type RunOutcome } from './loop.js';
 import { createModel } from './model.js';
+import { herdrReporter } from './herdr.js';
 import { pasteCollapser } from './paste.js';
 import { listSessions, openSessionLog, readConversation } from './session.js';
 import { createTerminal, terminalText } from './terminal.js';
@@ -42,6 +43,7 @@ const EXIT_CODE: Record<RunOutcome['reason'], number> = {
   limit: 1,
   error: 1,
 };
+
 const HELP = `pith — a plain-terminal coding agent
 
 Usage: pith [--cwd PATH] ["task"]
@@ -99,6 +101,11 @@ async function main() {
   const secrets = [openrouterApiKey, exaApiKey];
   const tools = await createTools(cwd, exaApiKey);
   const toolNames = tools.definitions.map(tool => tool.name).join(', ');
+  // Background jobs die with pith. A signal that would end pith skips 'exit', so exit for it.
+  process.on('exit', () => tools.jobs.stopAll());
+  for (const name of ['SIGHUP', 'SIGTERM'] as const) {
+    process.once(name, () => process.exit(128 + constants.signals[name]));
+  }
 
   let activeTurn: AbortController | undefined;
   const interrupt = () => activeTurn?.abort();
@@ -138,11 +145,14 @@ async function main() {
   );
   const generate = createModel(config, log.id);
   const transcript = createTranscript(term, generate.contextWindow);
+  const herdr = herdrReporter();
 
   // A fresh readline per question: none exists while the agent runs, so nothing echoes typing.
   const history: string[] = [];
+  let draft = ''; // what was typed when `wake` interrupted the question, offered again next time
   // `mark` replaces ❯ for one-off questions, which also stay out of the up-arrow history.
-  async function ask(mark = PROMPT_MARK): Promise<string | undefined> {
+  // `wake` ends the question early with '', keeping what was typed so far.
+  async function ask(mark = PROMPT_MARK, wake?: AbortSignal): Promise<string | undefined> {
     const paste = pasteCollapser(process.stdin, process.stdout);
     const readline = createInterface({
       input: paste.input,
@@ -159,13 +169,21 @@ async function main() {
         history.splice(0, history.length, ...entries);
       });
     }
-    const signal = AbortSignal.any([closed.signal, outputClosed.signal]);
+    const signal = AbortSignal.any([closed.signal, outputClosed.signal, ...(wake ? [wake] : [])]);
 
     // The color is left open so typed text shares it, and closed once the line is in.
     const tint = term.styled ? ansi.BOLD_CYAN : '';
     try {
-      return paste.expand(await readline.question(`\n${tint}${mark}`, { signal }));
+      const answer = readline.question(`\n${tint}${mark}`, { signal });
+      if (draft) readline.write(draft);
+      draft = '';
+      return paste.expand(await answer);
     } catch (error) {
+      if (wake?.aborted && !closed.signal.aborted && !outputClosed.signal.aborted) {
+        draft = readline.line;
+        process.stdout.write(ansi.CLEAR_LINE);
+        return '';
+      }
       if (signal.aborted) return undefined;
       throw error;
     } finally {
@@ -175,10 +193,12 @@ async function main() {
     }
   }
 
-  async function runPrompt(prompt: string): Promise<RunOutcome> {
-    if (Buffer.byteLength(prompt) > MAX_PROMPT_BYTES) throw new Error(PROMPT_TOO_LONG);
+  // With no prompt, the turn answers whatever is in the inbox.
+  async function runPrompt(prompt?: string): Promise<RunOutcome> {
+    if (prompt && Buffer.byteLength(prompt) > MAX_PROMPT_BYTES) throw new Error(PROMPT_TOO_LONG);
     activeTurn = new AbortController();
     term.busy(true);
+    void herdr.state('working');
     if (interactive) term.blankLine();
     transcript.begin();
     const outcome = await runTurn({
@@ -186,6 +206,7 @@ async function main() {
       context,
       generate,
       tools,
+      inbox: tools.jobs.drain,
       record: log.record,
       onProgress: transcript.onProgress,
       signal: AbortSignal.any([activeTurn.signal, outputClosed.signal]),
@@ -193,6 +214,7 @@ async function main() {
     activeTurn = undefined;
     transcript.end(outcome, Buffer.byteLength(JSON.stringify(context)));
     term.busy(false);
+    void herdr.state('idle');
     return outcome;
   }
 
@@ -238,8 +260,18 @@ async function main() {
     }
 
     // Ctrl-C or Ctrl-D at the prompt quits. A new conversation is a new launch.
+    await herdr.session(log.path);
+    void herdr.state('idle');
     while (!outputClosed.signal.aborted) {
-      const prompt = (await ask())?.trim();
+      // A background job that ends while we wait for the user starts a turn of its own.
+      if (tools.jobs.pending()) {
+        await runPrompt();
+        continue;
+      }
+      const wake = new AbortController();
+      const stopListening = tools.jobs.onEnd(() => wake.abort());
+      const prompt = (await ask(PROMPT_MARK, wake.signal))?.trim();
+      stopListening();
       if (prompt === undefined) break;
       if (prompt === '/resume' || prompt.startsWith('/resume '))
         await resume(prompt.slice(7).trim());

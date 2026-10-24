@@ -1,6 +1,6 @@
 import type { AssistantMessage, Context, Message, ToolCall, Usage } from '@earendil-works/pi-ai';
 import { errorText } from './errors.js';
-import type { Generate } from './model.js';
+import type { Generate, StreamEvent } from './model.js';
 import type { RecordEvent } from './session.js';
 import type { ToolOutput, ToolSet } from './tools/index.js';
 
@@ -14,9 +14,10 @@ const NOT_RUN: ToolOutput = {
 // Progress events for whoever draws the UI. The loop never prints.
 export type Notice =
   | { type: 'request'; step: number }
-  | { type: 'text'; text: string }
+  | StreamEvent
   | { type: 'tool-start'; call: ToolCall }
   | { type: 'tool-end'; call: ToolCall; result: ToolOutput }
+  | { type: 'inbox'; notices: string[] }
   | { type: 'usage'; usage: Usage };
 
 export interface RunOutcome {
@@ -25,7 +26,9 @@ export interface RunOutcome {
 }
 
 export interface TurnOptions {
-  prompt: string;
+  prompt?: string; // none when the turn only answers notices, e.g. a background job ending
+  // Notices that arrived since the last request, such as finished background jobs.
+  inbox?: () => Promise<string[]>;
   context: Context;
   generate: Generate;
   tools: ToolSet;
@@ -71,7 +74,7 @@ export async function runTurn(options: TurnOptions): Promise<RunOutcome> {
   };
 
   if (signal.aborted) return finish('aborted', 'Cancelled before starting.');
-  await append({ role: 'user', content: prompt, timestamp: Date.now() });
+  if (prompt) await append({ role: 'user', content: prompt, timestamp: Date.now() });
 
   // No step limit: a turn ends when the model answers in text, is cancelled, or fills the context.
   for (let step = 1; ; step++) {
@@ -83,10 +86,17 @@ export async function runTurn(options: TurnOptions): Promise<RunOutcome> {
       );
     }
 
+    // Delivered before every request, so the model hears about them mid-turn too.
+    const notices = (await options.inbox?.()) ?? [];
+    if (notices.length) {
+      await append({ role: 'user', content: notices.join('\n\n'), timestamp: Date.now() });
+      onProgress({ type: 'inbox', notices });
+    }
+
     onProgress({ type: 'request', step });
     let response: AssistantMessage;
     try {
-      response = await generate(context, signal, text => onProgress({ type: 'text', text }));
+      response = await generate(context, signal, onProgress);
     } catch (error) {
       return finish(signal.aborted ? 'aborted' : 'error', errorText(error));
     }

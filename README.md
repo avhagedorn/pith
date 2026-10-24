@@ -2,7 +2,7 @@
 
 A small coding agent for your terminal.
 
-It asks a model what to do, runs the tools the model asks for, and keeps going until it has an answer. That's the whole thing: under **2,000 lines** of TypeScript, six tools, no TUI, no context bloat.
+It asks a model what to do, runs the tools the model asks for, and keeps going until it has an answer. That's the whole thing: under **2,000 lines** of TypeScript, seven tools, no TUI, no context bloat.
 
 ![pith finding and fixing a failing test, then searching the web](docs/demo.gif)
 
@@ -86,7 +86,7 @@ Ask the model. Run the tools it asks for. Repeat until it answers in text. That'
 
 A turn has no step limit. It ends when the model answers, when you cancel, or at **512 KiB** of context.
 
-### Six tools
+### Seven tools
 
 | Tool | What it does |
 |---|---|
@@ -94,6 +94,7 @@ A turn has no step limit. It ends when the model answers, when you cancel, or at
 | `write` | Creates or replaces a file. |
 | `edit` | One exact search and replace. If the match is missing or ambiguous, nothing changes. |
 | `bash` | Runs a command in the repo. |
+| `background` | Runs a command without blocking: a dev server, a watcher, a long test run. It gets a pty where one is available, so output is not stuck in a 4 KiB buffer; `check` can wait for a log pattern (`until`) instead of the model polling; `kill` sends SIGTERM and escalates to SIGKILL. The model is told when the job exits, even mid-turn or while you're at the prompt. |
 | `search` | Web search: titles, URLs and excerpts. |
 | `fetch` | A web page as plain text. |
 

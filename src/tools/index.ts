@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises';
 import { errorText } from '../errors.js';
 import { bash } from './bash/index.js';
+import { background, createJobs, type Jobs } from './background/index.js';
 import { edit } from './edit/index.js';
 import { fetchPage } from './fetch/index.js';
 import { read } from './read/index.js';
@@ -9,13 +10,27 @@ import { bounded, type ToolSet } from './shared.js';
 import { write } from './write/index.js';
 
 export type { ToolOutput, ToolSet } from './shared.js';
+export type { Jobs } from './background/index.js';
 
-export async function createTools(cwd: string, exaApiKey?: string): Promise<ToolSet> {
+export async function createTools(
+  cwd: string,
+  exaApiKey?: string,
+): Promise<ToolSet & { jobs: Jobs }> {
   const root = await realpath(cwd);
-  const tools = [read(root), write(root), edit(root), bash(root), search(exaApiKey), fetchPage()];
+  const jobs = createJobs(root);
+  const tools = [
+    read(root),
+    write(root),
+    edit(root),
+    bash(root),
+    background(jobs),
+    search(exaApiKey),
+    fetchPage(),
+  ];
   const runners = new Map(tools.map(tool => [tool.definition.name, tool.run]));
 
   return {
+    jobs,
     definitions: tools.map(tool => tool.definition),
     // Never throws: bad arguments and tool failures come back as error results for the model.
     async execute(call, signal) {

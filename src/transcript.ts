@@ -1,11 +1,20 @@
 import type { Message, ToolCall } from '@earendil-works/pi-ai';
 import { MAX_CONTEXT_BYTES, type Notice, type RunOutcome } from './loop.js';
 import { markdownStyler } from './markdown.js';
-import { contextUse, detail, newStats, preview, rule, summary } from './render.js';
+import { contextUse, detail, duration, newStats, preview, rule, summary } from './render.js';
 import type { Terminal } from './terminal.js';
 import type { ToolOutput } from './tools/index.js';
 
 const WEB_TOOLS = new Set(['search', 'fetch']);
+// PITH_PROFILE=1 prints how each model request spent its time.
+const PROFILE = Boolean(process.env.PITH_PROFILE);
+
+type Phase = 'thinking' | 'text' | 'tool-call';
+interface Timing {
+  start: number;
+  end: number;
+  size: number;
+}
 
 interface Burst {
   name: string;
@@ -29,6 +38,41 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
   let rowsAbove = false; // tool rows sit directly above, so text needs a blank line first
   let textAbove = false; // text sits directly above, so rows need a blank line first
   let shownAnything = false; // this turn has output, so the summary needs a blank line first
+  let phase: Phase | 'waiting' | undefined; // what the model is doing, shown while it streams
+  let requestStart = 0;
+  let requestNumber = 0;
+  let firstByte = 0;
+  let timings: Partial<Record<Phase, Timing>> = {};
+
+  // Only the phase the model is actually in gets a row: waiting, thinking, or writing a call.
+  const showPhase = (next: Phase | 'waiting', tool?: string) => {
+    if (next === phase) return;
+    phase = next;
+    if (next === 'waiting') term.row('waiting for model', 'run', 'transient');
+    if (next === 'thinking') term.row('thinking', 'run', 'transient');
+    if (next === 'tool-call') term.row(`writing ${tool ?? 'a tool'} call`, 'run', 'transient');
+  };
+
+  const track = (kind: Phase, size: number) => {
+    const now = Date.now();
+    firstByte ||= now;
+    const timing = (timings[kind] ??= { start: now, end: now, size: 0 });
+    timing.end = now;
+    timing.size += size;
+  };
+
+  const profileLine = (input: number, output: number) => {
+    const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+    const parts = [`request ${requestNumber}`];
+    if (firstByte) parts.push(`first byte ${seconds(firstByte - requestStart)}`);
+    for (const kind of ['thinking', 'tool-call', 'text'] as const) {
+      const timing = timings[kind];
+      if (timing)
+        parts.push(`${kind} ${seconds(timing.end - timing.start)} (${timing.size} chars)`);
+    }
+    parts.push(`total ${seconds(Date.now() - requestStart)}`, `${input} in / ${output} out tokens`);
+    term.status(`  ${parts.join(' · ')}`, true);
+  };
 
   const print = (styledLine: string) => {
     burst = undefined;
@@ -70,6 +114,8 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
 
     const path = String(call.arguments?.path);
     if (call.name === 'bash') stats.commands++;
+    else if (call.name === 'background')
+      stats.commands += call.arguments?.action === 'start' ? 1 : 0;
     else if (call.name === 'read') stats.reads.add(path);
     else if (WEB_TOOLS.has(call.name)) stats.lookups++;
     else stats.edits.add(path);
@@ -127,6 +173,7 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
     },
 
     begin() {
+      requestNumber = 0;
       stats = newStats();
       burst = undefined;
       rowsAbove = textAbove = shownAnything = false;
@@ -136,10 +183,22 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
       switch (notice.type) {
         case 'request':
           endText();
+          phase = undefined;
+          requestNumber = notice.step;
+          requestStart = Date.now();
+          firstByte = 0;
+          timings = {};
           breakAfterText();
-          term.row('thinking', 'run', 'transient');
+          showPhase('waiting');
+          break;
+        case 'thinking':
+        case 'tool-call':
+          track(notice.type, notice.size);
+          showPhase(notice.type, notice.type === 'tool-call' ? notice.tool : undefined);
           break;
         case 'text': {
+          track('text', notice.text.length);
+          phase = 'text';
           const lines = (pending + notice.text).split('\n');
           pending = lines.pop()!;
           lines.forEach(say);
@@ -154,6 +213,13 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
         case 'tool-end':
           toolEnded(notice.call, notice.result);
           break;
+        case 'inbox':
+          endText();
+          breakAfterText();
+          burst = undefined;
+          rowsAbove = shownAnything = true;
+          for (const text of notice.notices) term.row(text.split('\n')[0]!, 'wait');
+          break;
         case 'usage':
           stats.cost += notice.usage.cost.total;
           contextTokens =
@@ -161,6 +227,10 @@ export function createTranscript(term: Terminal, contextWindow = Infinity) {
             notice.usage.cacheRead +
             notice.usage.cacheWrite +
             notice.usage.output;
+          if (PROFILE) {
+            endText();
+            profileLine(notice.usage.input + notice.usage.cacheRead, notice.usage.output);
+          }
       }
     },
 

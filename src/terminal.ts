@@ -1,5 +1,5 @@
 import * as ansi from './ansi.js';
-import { row, type RowState } from './render.js';
+import { duration, row, type RowState } from './render.js';
 
 const FALLBACK_WIDTH = 100;
 const MAX_WIDTH = 110;
@@ -47,11 +47,15 @@ export function createTerminal(clean: (text: string) => string, onInterrupt: () 
     clearInterval(animation);
     animation = undefined;
   };
+  // It also counts up once it has been running for a second, so a slow step is visible.
   const animate = (text: string) => {
+    const startedAt = Date.now();
     let lit = false;
     const draw = () => {
       lit = !lit;
-      process.stderr.write(wipe + row(clean(text), lit ? 'run' : 'wait', color, width()));
+      const elapsed = duration(Date.now() - startedAt);
+      const body = elapsed ? `${clean(text)} ${elapsed}` : clean(text);
+      process.stderr.write(wipe + row(body, lit ? 'run' : 'wait', color, width()));
     };
     draw();
     animation = setInterval(draw, BLINK_MS);

@@ -37,6 +37,11 @@ export function preview(call: ToolCall): string {
   if (call.name === 'bash') return `$ ${args.command ?? '...'}`;
   if (call.name === 'search') return `search ${args.query ?? '...'}`;
   if (call.name === 'fetch') return `fetch ${args.url ?? '...'}`;
+  if (call.name === 'background') {
+    return args.action === 'start'
+      ? `$ ${args.command ?? '...'} &`
+      : `background ${args.action} ${args.id ?? ''}`.trim();
+  }
 
   let out = `${call.name} ${args.path ?? JSON.stringify(args)}`;
   if (call.name === 'read' && (args.offset || args.limit)) {

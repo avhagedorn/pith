@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { createTools } from '../../src/tools/index.js';
 import { call, fixture, signal } from './helpers.js';
 
-test('all six tools are always available', async t => {
+test('all seven tools are always available', async t => {
   const tools = await createTools(await fixture(t));
   assert.deepEqual(
     tools.definitions.map(tool => tool.name),
-    ['read', 'write', 'edit', 'bash', 'search', 'fetch'],
+    ['read', 'write', 'edit', 'bash', 'background', 'search', 'fetch'],
   );
 });
 

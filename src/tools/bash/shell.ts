@@ -7,9 +7,9 @@ export const DEFAULT_TIMEOUT_S = 30;
 const RESERVED_BYTES = 1024;
 const HEAD_BYTES = 8 * 1024;
 const TAIL_BYTES = MAX_OUTPUT_BYTES - HEAD_BYTES - RESERVED_BYTES;
-const SHELL = '/bin/bash';
+export const SHELL = '/bin/bash';
 // No profile or rc file: startup scripts would run with the user's full setup.
-const SHELL_FLAGS = ['--noprofile', '--norc', '-c'];
+export const SHELL_FLAGS = ['--noprofile', '--norc', '-c'];
 const INHERITED_VARIABLES = [
   'PATH',
   'HOME',

@@ -40,11 +40,12 @@ function fixture(replies: AssistantMessage[]) {
   const seen: Context[] = [];
   const executed: string[] = [];
   const controller = new AbortController();
-  const generate: Generate = async (ctx, _signal, onText) => {
+  const generate: Generate = async (ctx, _signal, onStream) => {
     seen.push(structuredClone(ctx));
     const reply = replies.shift();
     if (!reply) throw new Error('No scripted response');
-    for (const block of reply.content) if (block.type === 'text') onText(block.text);
+    for (const block of reply.content)
+      if (block.type === 'text') onStream({ type: 'text', text: block.text });
     return reply;
   };
   const options = {
@@ -172,4 +173,30 @@ test('disk failure before the execution marker prevents tool execution', async (
   };
   await assert.rejects(runTurn(f.options), /disk full/);
   assert.deepEqual(f.executed, []);
+});
+
+test('inbox notices reach the model before the next request, mid-turn', async () => {
+  const f = fixture([response([tool()], 'toolUse'), final()]);
+  const inbox = [[], ['Background job 1 exited 0 after 2s: npm test']];
+  const turn = { ...f.options, inbox: async () => inbox.shift() ?? [] };
+  assert.equal((await runTurn(turn)).reason, 'complete');
+  assert.deepEqual(
+    f.seen[1]?.messages.map(m => m.role),
+    ['user', 'assistant', 'toolResult', 'user'],
+  );
+  assert.equal(f.seen[1]?.messages[3]?.content, 'Background job 1 exited 0 after 2s: npm test');
+  assert.ok(f.notices.some(n => n.type === 'inbox'));
+});
+
+test('a turn without a prompt answers its inbox', async () => {
+  const f = fixture([final()]);
+  const turn = { ...f.options, prompt: undefined, inbox: async () => ['Background job 2 ended'] };
+  assert.equal((await runTurn(turn)).reason, 'complete');
+  assert.deepEqual(f.seen[0]?.messages, [
+    {
+      role: 'user',
+      content: 'Background job 2 ended',
+      timestamp: f.seen[0]?.messages[0]?.timestamp,
+    },
+  ]);
 });
